@@ -60,7 +60,7 @@ export function CartDropdown() {
               </p>
             </div>
           ) : (
-            <p className="text-sm font-medium leading-none">Cart is empty</p>
+            <p className="text-sm font-medium leading-none">Your cart</p>
           )}
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
@@ -85,6 +85,12 @@ export function CartDropdown() {
               </p>
             </Link>
           ))}
+
+          {!cart?.length && (
+            <p className="mx-auto w-2/3 py-4 text-center text-sm font-medium leading-none text-muted-foreground">
+              Nothing here yet
+            </p>
+          )}
         </div>
         {!!cart?.length ? (
           <>

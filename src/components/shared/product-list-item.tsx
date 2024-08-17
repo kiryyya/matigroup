@@ -184,7 +184,7 @@ const ProductItemActions: React.FC<{
             <Button
               isLoading={addToCart.isPending}
               disabled={product.stock === 0}
-              className="w-full"
+              className="w-full px-4"
               size="icon"
               onClick={(e) => {
                 e.preventDefault();
