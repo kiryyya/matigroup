@@ -6,11 +6,11 @@ import { Inter as FontSans } from "next/font/google";
 import { TRPCReactProvider } from "~/trpc/react";
 import { cn } from "~/lib/utils";
 import { Toaster } from "~/components/ui/sonner";
-import { TailwindIndicator } from "~/components/utils/tailwind-indicator";
 import { ThemeProvider } from "~/components/utils/theme-provider";
 import { HydrateClient } from "~/trpc/server";
 import GeneralLayout from "~/components/layouts/general-layout";
 import { CSPostHogProvider } from "./providers";
+import TelegramWebAppInit from "~/components/telegram-webapp-init";
 
 const fontSans = FontSans({
   subsets: ["latin"],
@@ -35,7 +35,7 @@ export default async function RootLayout({
       <CSPostHogProvider>
         <body
           className={cn(
-            "min-h-screen bg-background font-sans antialiased",
+            "h-screen bg-background font-sans antialiased overflow-hidden mt-24",
             fontSans.variable,
           )}
         >
@@ -47,11 +47,11 @@ export default async function RootLayout({
           >
             <TRPCReactProvider>
               <HydrateClient>
+                <TelegramWebAppInit />
                 <GeneralLayout>{children}</GeneralLayout>
               </HydrateClient>
             </TRPCReactProvider>
             <Toaster />
-            <TailwindIndicator />
           </ThemeProvider>
         </body>
       </CSPostHogProvider>

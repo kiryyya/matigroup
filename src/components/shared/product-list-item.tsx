@@ -6,7 +6,7 @@ import { BookDashed, Minus, Plus, Trash } from "lucide-react";
 import { api } from "~/trpc/react";
 import { toast } from "sonner";
 import Link from "next/link";
-import posthog from "posthog-js";
+// PostHog removed
 
 const ProductImage: React.FC<{
   product: Product;
@@ -54,22 +54,13 @@ export const useProductActions = (product: Product) => {
       toast.error(`Failed to add to cart: ${error.message}`);
     },
     onSuccess: () => {
-      posthog.capture("add-to-cart", {
-        productId: product.id,
-        productName: product.name,
-        productPrice: product.price,
-      });
       void utils.shop.products.invalidate();
       void utils.shop.cart.invalidate();
     },
   });
   const removeFromCart = api.shop.removeFromCart.useMutation({
     onSuccess: () => {
-      posthog.capture("remove-from-cart", {
-        productId: product.id,
-        productName: product.name,
-        productPrice: product.price,
-      });
+      // PostHog removed
     },
     onError(error) {
       toast.error(`Failed to remove from cart: ${error.message}`);
@@ -81,12 +72,7 @@ export const useProductActions = (product: Product) => {
   });
   const updateCartItem = api.shop.updateCartItem.useMutation({
     onSuccess: () => {
-      posthog.capture("update-cart-item", {
-        productId: product.id,
-        productName: product.name,
-        productPrice: product.price,
-        quantity: cartItem?.quantity,
-      });
+      // PostHog removed
     },
     onError(error) {
       toast.error(`Failed to update cart item: ${error.message}`);

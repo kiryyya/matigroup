@@ -1,6 +1,6 @@
 "use client";
 
-import posthog from "posthog-js";
+// PostHog removed
 import { useEffect, useState } from "react";
 import { type TelegramWebApps } from "telegram-webapps-types";
 
@@ -38,17 +38,7 @@ function useTelegramInitData() {
     setData({ ...initData });
   }, []);
 
-  useEffect(() => {
-    if (data.user?.id) {
-      posthog.identify(data.user?.id.toString(), {
-        telegram_id: data.user?.id,
-        telegram_username: data.user?.usernames,
-        telegram_first_name: data.user?.first_name,
-        telegram_last_name: data.user?.last_name,
-        language_code: data.user?.language_code,
-      });
-    }
-  }, [data]);
+  // PostHog removed
 
   return { ...data };
 }
