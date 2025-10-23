@@ -145,7 +145,7 @@ export const shopRouter = createTRPCRouter({
             ),
           },
         ],
-        title: `Purchase ${cart.length} item(s) in ffmemes shop`,
+        title: `Purchase ${cart.length} item(s) in shop`,
         description: `Purchase ${cart.map((i) => i.product.name).join(", ")}`,
       });
 

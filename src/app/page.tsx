@@ -70,12 +70,12 @@ const ProductList = () => {
           <p
             onClick={() => {
               void navigator.clipboard.writeText(
-                `t.me/ffmemeswebappstagingbot/sample?startapp=${user?.telegramId}`,
+                `t.me/yourbot/sample?startapp=${user?.telegramId}`,
               );
             }}
             className="cursor-pointer text-sm text-muted-foreground active:scale-95"
           >
-            {`t.me/ffmemeswebappstagingbot/sample?startapp=${user?.telegramId}`}
+            {`t.me/yourbot/sample?startapp=${user?.telegramId}`}
           </p>
         </div>
       )}

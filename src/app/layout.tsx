@@ -9,7 +9,7 @@ import { Toaster } from "~/components/ui/sonner";
 import { ThemeProvider } from "~/components/utils/theme-provider";
 import { HydrateClient } from "~/trpc/server";
 import GeneralLayout from "~/components/layouts/general-layout";
-import { CSPostHogProvider } from "./providers";
+// PostHog removed
 import TelegramWebAppInit from "~/components/telegram-webapp-init";
 
 const fontSans = FontSans({
@@ -32,29 +32,27 @@ export default async function RootLayout({
         {/* eslint-disable-next-line @next/next/no-sync-scripts */}
         <script src="https://telegram.org/js/telegram-web-app.js"></script>
       </head>
-      <CSPostHogProvider>
-        <body
-          className={cn(
-            "h-screen bg-background font-sans antialiased overflow-hidden mt-24",
-            fontSans.variable,
-          )}
+      <body
+        className={cn(
+          "h-screen bg-background font-sans antialiased overflow-hidden mt-24",
+          fontSans.variable,
+        )}
+      >
+        <ThemeProvider
+          attribute="class"
+          defaultTheme="system"
+          enableSystem
+          disableTransitionOnChange
         >
-          <ThemeProvider
-            attribute="class"
-            defaultTheme="system"
-            enableSystem
-            disableTransitionOnChange
-          >
-            <TRPCReactProvider>
-              <HydrateClient>
-                <TelegramWebAppInit />
-                <GeneralLayout>{children}</GeneralLayout>
-              </HydrateClient>
-            </TRPCReactProvider>
-            <Toaster />
-          </ThemeProvider>
-        </body>
-      </CSPostHogProvider>
+          <TRPCReactProvider>
+            <HydrateClient>
+              <TelegramWebAppInit />
+              <GeneralLayout>{children}</GeneralLayout>
+            </HydrateClient>
+          </TRPCReactProvider>
+          <Toaster />
+        </ThemeProvider>
+      </body>
     </html>
   );
 }

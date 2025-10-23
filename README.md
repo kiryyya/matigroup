@@ -4,7 +4,7 @@
 
 ## [Документация](https://tg-webapp-nextra-docs.vercel.app/)
 
-[Демо](https://t.me/ffmemeswebappstagingbot/sample)
+[Демо](https://t.me/yourbot/sample)
 
 ## Стек
 
@@ -14,7 +14,7 @@
 - 🗃️ DrizzleORM + PosgreSQL
 - 🔌 tRPC
 - 🎨 shadcn/ui
-- 📊 PostHog аналитика, session replay, feature flags, и тд
+- 📊 Аналитика (PostHog удален)
 - 🌓 Auto Dark mode
 - 👥 Роли пользователей
 - ⏱️ Фоновые/запланированные/тяжелые задачи с Trigger.dev
