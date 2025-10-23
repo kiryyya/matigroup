@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import React, { useEffect, useState, type PropsWithChildren } from "react";
 import useTelegramInitData from "~/hooks/use-telegram-init-data";
-import { FolderHeart, Store, Settings } from "lucide-react";
+import { FolderHeart, Home, Settings } from "lucide-react";
 import { api } from "~/trpc/react";
 import { cn } from "~/lib/utils";
 
@@ -21,18 +21,7 @@ const GeneralLayout = ({ children }: PropsWithChildren) => {
       return;
     }
 
-    if (user?.usedCodes?.includes(`${start_param}`)) {
-      setShouldShowAlert(`Code ${start_param} is already used`);
-      return;
-    }
-
-    if (user.activatedCodes?.includes(`${start_param}`)) {
-      setShouldShowAlert(`Code ${start_param} is already activated`);
-      return;
-    }
-
-    setShouldShowAlert(`You've activated the code: ${start_param}`);
-    return;
+    // Referral logic removed
   }, [start_param, user?.telegramId]);
 
   useEffect(() => {
@@ -62,7 +51,7 @@ const GeneralLayout = ({ children }: PropsWithChildren) => {
                   : "text-muted-foreground hover:text-foreground"
               )}
             >
-              <Store className="h-5 w-5" />
+              <Home className="h-5 w-5" />
             </Link>
             <Link 
               href="/tap" 

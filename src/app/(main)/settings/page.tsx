@@ -117,8 +117,6 @@ const SettingsPage = () => {
             <p><strong>Имя:</strong> {user.name || "Не указано"}</p>
             <p><strong>Telegram ID:</strong> {user.telegramId}</p>
             <p><strong>Роль:</strong> {user.role}</p>
-            <p><strong>Реферальный код:</strong> {user.referralCode || "Не указан"}</p>
-            <p><strong>Количество рефералов:</strong> {user.referralCount}</p>
           </div>
         </CardContent>
       </Card>

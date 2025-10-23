@@ -1,7 +1,7 @@
 import { tgRouter } from "~/server/api/routers/tg";
 import { createCallerFactory, createTRPCRouter } from "~/server/api/trpc";
 import { shopRouter } from "./routers/shop";
-import { tapRouter } from "./routers/tap";
+// tapRouter removed
 
 /**
  * This is the primary router for your server.
@@ -11,7 +11,6 @@ import { tapRouter } from "./routers/tap";
 export const appRouter = createTRPCRouter({
   tg: tgRouter,
   shop: shopRouter,
-  tap: tapRouter,
 });
 
 // export type definition of API

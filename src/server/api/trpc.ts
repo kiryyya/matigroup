@@ -15,7 +15,7 @@ import { ZodError } from "zod";
 import { env } from "~/env";
 
 import { db } from "~/server/db";
-import { promocodes, users } from "../db/schema";
+import { users } from "../db/schema";
 import { eq, sql } from "drizzle-orm";
 
 /**
@@ -46,7 +46,7 @@ export const createTRPCContext = async (opts: { headers: Headers }) => {
     data.user ?? "null",
   ) as TelegramWebApps.WebAppUser;
 
-  const user = await chekOrCreateUser(webAppUser, data.start_param);
+  const user = await chekOrCreateUser(webAppUser);
 
   if (!user) {
     throw new TRPCError({ code: "UNAUTHORIZED" });
@@ -155,17 +155,11 @@ async function isHashValid(data: Record<string, string>, botToken: string) {
 
 const chekOrCreateUser = async (
   webAppUser: TelegramWebApps.WebAppUser,
-  promocode?: string,
 ) => {
   if (!webAppUser.id) return;
 
   let user = await db.query.users.findFirst({
     where: eq(users.telegramId, webAppUser.id.toString()),
-  });
-
-  console.log({
-    user,
-    promocode,
   });
 
   if (!user) {
@@ -178,49 +172,6 @@ const chekOrCreateUser = async (
       })
       .returning()
       .then((r) => r[0]);
-  }
-
-  if (promocode && user) {
-    const code = await db.query.promocodes.findFirst({
-      where: eq(promocodes.code, promocode),
-    });
-    const refUser = await db.query.users.findFirst({
-      where: eq(users.telegramId, promocode),
-    });
-
-    if (code ?? refUser) {
-      if (
-        (code && user.activatedCodes?.includes(code.code)) ??
-        (code && user.usedCodes?.includes(code.code)) ??
-        (refUser?.telegramId && user.usedCodes?.includes(refUser.telegramId))
-      ) {
-        return user;
-      }
-
-      if (code?.type === "referral") {
-        await db
-          .update(users)
-          .set({
-            tapCount: sql`${users.tapCount} + ${code.amount}`,
-            usedCodes: [...(user.usedCodes ?? []), code.code],
-          })
-          .where(eq(users.id, user.id));
-      } else if (code?.type === "promocode") {
-        await db
-          .update(users)
-          .set({
-            activatedCodes: [...(user.activatedCodes ?? []), `${code.code}`],
-          })
-          .where(eq(users.id, user.id));
-      } else if (refUser?.telegramId) {
-        await db
-          .update(users)
-          .set({
-            usedCodes: [...(user.usedCodes ?? []), `${refUser?.telegramId}`],
-          })
-          .where(eq(users.id, user.id));
-      }
-    }
   }
 
   return user;
