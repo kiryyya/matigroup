@@ -4,31 +4,69 @@ import useTelegramInitData from "~/hooks/use-telegram-init-data";
 
 import * as React from "react";
 import { api } from "~/trpc/react";
-import { Skeleton } from "~/components/ui/skeleton";
-import DefaultError from "~/components/layouts/error-page";
-// Products removed
-import { Badge } from "~/components/ui/badge";
+import Link from "next/link";
+import { Card, CardDescription, CardHeader, CardTitle } from "~/components/ui/card";
 
 export default function Home() {
-  const { data } = api.tg.getUser.useQuery();
-  const { user } = useTelegramInitData();
+  // const { data } = api.tg.getUser.useQuery();
+  // const { user } = useTelegramInitData();
 
   return (
     <>
-      <h1 className="scroll-m-20 text-3xl font-extrabold">
-        Welcome, {user?.first_name}
-      </h1>
 
 
-      <div className="flex h-full items-center justify-center">
-        <div className="text-center">
-          <h2 className="text-xl font-semibold text-muted-foreground">
-            Добро пожаловать!
-          </h2>
-          <p className="mt-2 text-muted-foreground">
-            Здесь будет новый функционал
-          </p>
-        </div>
+      <div className="grid gap-4 md:grid-cols-2">
+        <Link href="/category/real-estate">
+          <Card className="cursor-pointer transition-all hover:shadow-lg">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                🏠 Недвижимость
+              </CardTitle>
+              <CardDescription>
+                Проекты недвижимости и архитектурные решения
+              </CardDescription>
+            </CardHeader>
+          </Card>
+        </Link>
+
+        <Link href="/category/interiors">
+          <Card className="cursor-pointer transition-all hover:shadow-lg">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                🎨 Интерьеры
+              </CardTitle>
+              <CardDescription>
+                Дизайн интерьеров и декоративные решения
+              </CardDescription>
+            </CardHeader>
+          </Card>
+        </Link>
+
+        <Link href="/category/facades">
+          <Card className="cursor-pointer transition-all hover:shadow-lg">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                🏢 Фасады
+              </CardTitle>
+              <CardDescription>
+                Фасадные решения и внешний дизайн зданий
+              </CardDescription>
+            </CardHeader>
+          </Card>
+        </Link>
+
+        <Link href="/category/furniture">
+          <Card className="cursor-pointer transition-all hover:shadow-lg">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                🪑 Мебель
+              </CardTitle>
+              <CardDescription>
+                Мебельные решения и предметы интерьера
+              </CardDescription>
+            </CardHeader>
+          </Card>
+        </Link>
       </div>
     </>
   );

@@ -15,6 +15,13 @@
       "when": 1760992498022,
       "tag": "0001_conscious_unicorn",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1761240490704,
+      "tag": "0002_neat_rockslide",
+      "breakpoints": true
     }
   ]
 }
