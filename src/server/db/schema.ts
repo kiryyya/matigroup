@@ -36,11 +36,9 @@ export const users = createTable("user", {
     .notNull()
     .default("user")
     .$type<"user" | "admin">(),
+  favorites: json("favorites").$type<number[]>().default([]),
 });
 
-export const usersRelations = relations(users, ({ many }) => ({
-  projects: many(projects),
-}));
 
 // Categories table
 export const categories = createTable("categories", {
@@ -65,6 +63,7 @@ export const projects = createTable("projects", {
   description: text("description"),
   content: text("content"), // detailed description
   images: json("images").$type<string[]>(),
+  attachments: json("attachments").$type<string[]>(),
   categoryId: integer("category_id")
     .notNull()
     .references(() => categories.id, { onDelete: "cascade" }),
@@ -88,6 +87,7 @@ export const categoriesRelations = relations(categories, ({ many }) => ({
   projects: many(projects),
 }));
 
+
 export const projectsRelations = relations(projects, ({ one }) => ({
   category: one(categories, {
     fields: [projects.categoryId],
@@ -99,8 +99,14 @@ export const projectsRelations = relations(projects, ({ one }) => ({
   }),
 }));
 
+
+export const usersRelations = relations(users, ({ many }) => ({
+  projects: many(projects),
+}));
+
 export type Category = InferSelectModel<typeof categories>;
 export type Project = InferSelectModel<typeof projects>;
+export type User = InferSelectModel<typeof users>;
 
 
 

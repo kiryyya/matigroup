@@ -20,7 +20,52 @@ bot.on("message", async (ctx) => {
 bot.start(async (ctx) => {
   await checkChatId(ctx);
 
-  await ctx.reply("Welcome to the bot!");
+  // Получаем параметр start из команды
+  const startParam = ctx.message?.text?.split(' ')[1] || '';
+  console.log('Start command with param:', startParam);
+
+  // URL для WebApp
+  const webAppUrl = `${getBaseUrl()}`;
+  
+  // Создаем кнопку для открытия WebApp
+  const keyboard = {
+    inline_keyboard: [
+      [
+        {
+          text: "🚀 Открыть приложение",
+          web_app: { url: webAppUrl }
+        }
+      ]
+    ]
+  };
+
+  if (startParam) {
+    // Если есть параметр, передаем его в WebApp
+    const webAppUrlWithParam = `${webAppUrl}?start=${startParam}`;
+    
+    await ctx.reply(
+      `Добро пожаловать! 🎉\n\nВы перешли по ссылке с параметром: ${startParam}\n\nНажмите кнопку ниже, чтобы открыть приложение:`,
+      {
+        reply_markup: {
+          inline_keyboard: [
+            [
+              {
+                text: "🚀 Открыть приложение",
+                web_app: { url: webAppUrlWithParam }
+              }
+            ]
+          ]
+        }
+      }
+    );
+  } else {
+    await ctx.reply(
+      "Добро пожаловать! 🎉\n\nНажмите кнопку ниже, чтобы открыть приложение:",
+      {
+        reply_markup: keyboard
+      }
+    );
+  }
 });
 
 bot.on("callback_query", async (ctx) => {

@@ -1,6 +1,6 @@
 import "~/styles/globals.css";
 
-import { type Metadata } from "next";
+import { type Metadata, type Viewport } from "next";
 import { Inter as FontSans } from "next/font/google";
 
 import { TRPCReactProvider } from "~/trpc/react";
@@ -9,8 +9,10 @@ import { Toaster } from "~/components/ui/sonner";
 import { ThemeProvider } from "~/components/utils/theme-provider";
 import { HydrateClient } from "~/trpc/server";
 import GeneralLayout from "~/components/layouts/general-layout";
+import { ModalProvider } from "~/contexts/modal-context";
 // PostHog removed
 import TelegramWebAppInit from "~/components/telegram-webapp-init";
+import TelegramStartParamHandler from "~/components/telegram-start-param-handler";
 
 const fontSans = FontSans({
   subsets: ["latin"],
@@ -21,6 +23,13 @@ export const metadata: Metadata = {
   title: "Fusion",
   description: "Fusion",
   icons: [{ rel: "icon", url: "/favicon.ico" }],
+};
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
 };
 
 export default async function RootLayout({
@@ -46,8 +55,12 @@ export default async function RootLayout({
         >
           <TRPCReactProvider>
             <HydrateClient>
-              <TelegramWebAppInit />
-              <GeneralLayout>{children}</GeneralLayout>
+              <ModalProvider>
+                <TelegramWebAppInit />
+                <TelegramStartParamHandler>
+                  <GeneralLayout>{children}</GeneralLayout>
+                </TelegramStartParamHandler>
+              </ModalProvider>
             </HydrateClient>
           </TRPCReactProvider>
           <Toaster />
