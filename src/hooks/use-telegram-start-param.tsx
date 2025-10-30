@@ -9,7 +9,7 @@ export default function useTelegramStartParam() {
   const [startParam, setStartParam] = useState<string | null>(null);
 
   useEffect(() => {
-    // Получаем start_param из Telegram WebApp initData
+    // Получаем start_param/startapp из Telegram WebApp initData
     const getStartParam = () => {
       if (typeof window === "undefined") return null;
       
@@ -20,14 +20,14 @@ export default function useTelegramStartParam() {
         
         if (initData) {
           const urlParams = new URLSearchParams(initData);
-          const startParam = urlParams.get('start_param') || urlParams.get('start');
+          const startParam = urlParams.get('start_param') ?? urlParams.get('startapp') ?? urlParams.get('start');
           console.log('Найден start_param:', startParam);
           return startParam;
         }
         
         // Альтернативный способ - проверяем URL параметры
         const urlParams = new URLSearchParams(window.location.search);
-        const urlStartParam = urlParams.get('start');
+        const urlStartParam = urlParams.get('startapp') ?? urlParams.get('start');
         if (urlStartParam) {
           console.log('Найден start_param в URL:', urlStartParam);
           return urlStartParam;
@@ -35,7 +35,7 @@ export default function useTelegramStartParam() {
         
         // Также проверяем hash параметры (для Telegram WebApp)
         const hashParams = new URLSearchParams(window.location.hash.substring(1));
-        const hashStartParam = hashParams.get('start');
+        const hashStartParam = hashParams.get('startapp') ?? hashParams.get('start');
         if (hashStartParam) {
           console.log('Найден start_param в hash:', hashStartParam);
           return hashStartParam;
@@ -55,10 +55,20 @@ export default function useTelegramStartParam() {
 
     console.log('Обработка start_param:', startParamValue);
 
-    // Парсим параметр start
-    const parts = startParamValue.split('/');
-    const type = parts[0];
-    const id = parts[1];
+    // Поддерживаем два формата payload: "type/id" и "type_id"
+    let type = '';
+    let id: string | undefined;
+    if (startParamValue.includes('/')) {
+      const parts = startParamValue.split('/');
+      type = parts[0] ?? '';
+      id = parts[1];
+    } else if (startParamValue.includes('_')) {
+      const parts = startParamValue.split('_');
+      type = parts[0] ?? '';
+      id = parts[1];
+    } else {
+      type = startParamValue;
+    }
 
     // Небольшая задержка для корректной инициализации роутера
     const timer = setTimeout(() => {
@@ -79,6 +89,10 @@ export default function useTelegramStartParam() {
           } else {
             router.push('/');
           }
+          break;
+
+        case 'profile':
+          router.push('/settings');
           break;
 
         case 'settings':

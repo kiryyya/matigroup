@@ -20,8 +20,8 @@ const fontSans = FontSans({
 });
 
 export const metadata: Metadata = {
-  title: "Fusion",
-  description: "Fusion",
+  title: "matigroup bot",
+  description: "matigroup bot",
   icons: [{ rel: "icon", url: "/favicon.ico" }],
 };
 

@@ -22,6 +22,7 @@ export const env = createEnv({
    */
   client: {
     // PostHog removed
+    NEXT_PUBLIC_TG_BOT_USERNAME: z.string().optional(),
   },
 
   /**
@@ -32,6 +33,7 @@ export const env = createEnv({
     DATABASE_URL: process.env.DATABASE_URL,
     NODE_ENV: process.env.NODE_ENV,
     TELEGRAM_BOT_TOKEN: process.env.TELEGRAM_BOT_TOKEN,
+    NEXT_PUBLIC_TG_BOT_USERNAME: process.env.NEXT_PUBLIC_TG_BOT_USERNAME,
   },
   /**
    * Run `build` or `dev` with `SKIP_ENV_VALIDATION` to skip env validation. This is especially

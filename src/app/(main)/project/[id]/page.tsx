@@ -7,11 +7,13 @@ import { Button } from "~/components/ui/button";
 import { Skeleton } from "~/components/ui/skeleton";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Calendar, User, Download, Eye, FileText, Image, FileVideo, FileAudio, Archive, File, Trash2, X, Pencil } from "lucide-react";
+import { ArrowLeft, Calendar, User, Download, Eye, FileText, Image, FileVideo, FileAudio, Archive, File, Trash2, X, Pencil, Copy } from "lucide-react";
 import FavoriteButton from "~/components/favorite-button";
 import { useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "~/components/ui/dialog";
 import EditProjectModal from "~/components/edit-project-modal";
+import { toast } from "sonner";
+import { env } from "~/env.js";
 
 interface ProjectPageProps {
   params: {
@@ -344,6 +346,23 @@ export default function ProjectPage({ params }: ProjectPageProps) {
           </div>
           <div className="flex gap-2">
             <FavoriteButton projectId={displayProject.id} />
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                try {
+                    const link = `https://t.me/matibott_bot?startapp=project_${displayProject.id}`;
+                    void navigator.clipboard.writeText(link);
+                    toast.success("Ссылка для Mini App скопирована");
+                } catch (e) {
+                  toast.error("Не удалось скопировать ссылку");
+                }
+              }}
+              title="Скопировать ссылку"
+            >
+              <Copy className="h-4 w-4 mr-2" />
+              Скопировать
+            </Button>
           </div>
         </div>
 
