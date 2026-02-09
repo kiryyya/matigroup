@@ -4,16 +4,16 @@ import { api } from "~/trpc/react";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
-import { Skeleton } from "~/components/ui/skeleton";
+import { Progress } from "~/components/ui/progress";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Calendar, User, Download, Eye, FileText, Image, FileVideo, FileAudio, Archive, File, Trash2, X, Pencil, Copy } from "lucide-react";
+import { ArrowLeft, Calendar, User, Download, Eye, FileText, Image as ImageIcon, FileVideo, FileAudio, Archive, File, Trash2, X, Pencil, Copy, ChevronLeft, ChevronRight } from "lucide-react";
 import FavoriteButton from "~/components/favorite-button";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "~/components/ui/dialog";
 import EditProjectModal from "~/components/edit-project-modal";
 import { toast } from "sonner";
-import { env } from "~/env.js";
+import type { StoredAttachment, StoredImage } from "~/types/files";
 
 interface ProjectPageProps {
   params: {
@@ -26,8 +26,32 @@ export default function ProjectPage({ params }: ProjectPageProps) {
   
   // Состояния для модального окна файла
   const [isFileModalOpen, setIsFileModalOpen] = useState(false);
-  const [currentFile, setCurrentFile] = useState<{data: string, name: string, type: string} | null>(null);
+  const [currentFile, setCurrentFile] = useState<{
+    url?: string;
+    text?: string;
+    name: string;
+    type: string;
+    size?: number;
+  } | null>(null);
   const [isEditOpen, setIsEditOpen] = useState(false);
+  
+  // Состояние для карусели изображений
+  const [currentImageIndex, setCurrentImageIndex] = useState(0);
+
+  useEffect(() => {
+    return () => {
+      if (currentFile?.url) {
+        URL.revokeObjectURL(currentFile.url);
+      }
+    };
+  }, [currentFile?.url]);
+
+  useEffect(() => {
+    if (!isFileModalOpen && currentFile?.url) {
+      URL.revokeObjectURL(currentFile.url);
+      setCurrentFile(null);
+    }
+  }, [isFileModalOpen, currentFile?.url]);
   
   // Используем оптимизированный запрос для быстрой загрузки
   const { data: project, isLoading } = api.projects.project.useQuery({
@@ -58,6 +82,11 @@ export default function ProjectPage({ params }: ProjectPageProps) {
   // Используем полные данные для админов, оптимизированные для остальных
   const displayProject = user?.role === "admin" ? (projectFull || project) : project;
 
+  // Сброс индекса при изменении проекта
+  useEffect(() => {
+    setCurrentImageIndex(0);
+  }, [displayProject?.id]);
+
   const handleDeleteProject = async () => {
     if (!displayProject) return;
     
@@ -81,7 +110,7 @@ export default function ProjectPage({ params }: ProjectPageProps) {
     const extension = fileName.split('.').pop()?.toLowerCase();
     
     if (['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg'].includes(extension || '')) {
-      return <Image className="h-4 w-4" />;
+      return <ImageIcon className="h-4 w-4" />;
     }
     if (['mp4', 'avi', 'mov', 'wmv', 'flv', 'webm'].includes(extension || '')) {
       return <FileVideo className="h-4 w-4" />;
@@ -99,195 +128,145 @@ export default function ProjectPage({ params }: ProjectPageProps) {
     return <File className="h-4 w-4" />;
   };
 
-  const downloadFile = (fileData: string, fileName: string, withWatermark: boolean = false) => {
+  const downloadBlob = (blob: Blob, fileName: string) => {
     try {
-      console.log('Начинаем скачивание файла:', { fileName, hasData: fileData.length > 0, withWatermark });
-      
-      // Проверяем, что данные не пустые
-      if (!fileData || fileData.length === 0) {
-        throw new Error('Файл пустой или не найден');
-      }
-      
-      // Если это base64 данные
-      if (fileData.startsWith('data:')) {
-        // Создаем blob из base64
-        const base64Data = fileData.split(',')[1];
-        if (!base64Data) {
-          throw new Error('Некорректные base64 данные');
-        }
-        
-        // Определяем MIME тип
-        const mimeMatch = fileData.match(/data:([^;]+);/);
-        const mimeType = mimeMatch?.[1] ?? 'application/octet-stream';
-        
-        console.log('MIME тип:', mimeType);
-        
-        // Конвертируем base64 в blob
-        const byteCharacters = atob(base64Data);
-        const byteNumbers = new Array(byteCharacters.length);
-        for (let i = 0; i < byteCharacters.length; i++) {
-          byteNumbers[i] = byteCharacters.charCodeAt(i);
-        }
-        const byteArray = new Uint8Array(byteNumbers);
-        const blob = new Blob([byteArray], { type: mimeType });
-        
-        console.log('Blob создан:', { size: blob.size, type: blob.type });
-        
-        // Проверяем размер файла
-        if (blob.size === 0) {
-          throw new Error('Файл пустой');
-        }
-        
-        // Создаем URL для blob
-        const url = URL.createObjectURL(blob);
-        
-        // Создаем временную ссылку для скачивания
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = fileName;
-        link.style.display = 'none';
-        
-        // Добавляем в DOM, кликаем и удаляем
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        
-        // Очищаем URL через некоторое время
-        setTimeout(() => {
-          URL.revokeObjectURL(url);
-        }, 1000);
-        
-        console.log('Файл отправлен на скачивание');
-      } else {
-        // Обычная ссылка
-        const link = document.createElement('a');
-        link.href = fileData;
-        link.download = fileName;
-        link.target = '_blank';
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-      }
-    } catch (error) {
-      console.error('Ошибка скачивания файла:', error);
-      alert('Ошибка при скачивании файла: ' + (error instanceof Error ? error.message : String(error)));
-    }
-  };
-
-  const downloadFileWithWatermark = async (attachmentIndex: number, fileName: string) => {
-    try {
-      console.log('Начинаем скачивание файла с водяным знаком:', { attachmentIndex, fileName });
-      
-      const response = await fetch(`/api/files/${params.id}?attachmentIndex=${attachmentIndex}&watermark=true`);
-      
-      console.log('Ответ сервера:', { 
-        status: response.status, 
-        statusText: response.statusText,
-        headers: Object.fromEntries(response.headers.entries())
-      });
-      
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('Ошибка сервера:', errorText);
-        throw new Error(`Ошибка сервера: ${response.status} ${response.statusText}`);
-      }
-      
-      const blob = await response.blob();
-      console.log('Blob получен:', { size: blob.size, type: blob.type });
-      
-      if (blob.size === 0) {
-        throw new Error('Получен пустой файл');
-      }
-      
       const url = URL.createObjectURL(blob);
-      
-      const link = document.createElement('a');
+      const link = document.createElement("a");
       link.href = url;
-      link.download = fileName.replace(/\.[^/.]+$/, '_watermarked$&');
-      link.style.display = 'none';
-      
+      link.download = fileName;
+      link.style.display = "none";
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
-      
-      console.log('Файл с водяным знаком отправлен на скачивание');
-      
-      setTimeout(() => {
-        URL.revokeObjectURL(url);
-      }, 1000);
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
     } catch (error) {
-      console.error('Ошибка скачивания файла с водяным знаком:', error);
-      alert('Ошибка при скачивании файла с водяным знаком: ' + (error instanceof Error ? error.message : String(error)));
+      console.error("Ошибка скачивания файла:", error);
+      alert(
+        "Ошибка при скачивании файла: " +
+          (error instanceof Error ? error.message : String(error)),
+      );
     }
   };
 
-  const openFile = (fileData: string, fileName?: string) => {
+  const fetchAttachmentBlob = async (
+    attachmentIndex: number,
+    withWatermark: boolean,
+  ) => {
+    const initData = window.Telegram?.WebApp?.initData ?? "";
+    const response = await fetch(
+      `/api/files/${params.id}?attachmentIndex=${attachmentIndex}&watermark=${
+        withWatermark ? "true" : "false"
+      }`,
+      {
+        headers: {
+          "x-telegram-init-data": initData,
+        },
+      },
+    );
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error("Ошибка сервера:", errorText);
+      throw new Error(`Ошибка сервера: ${response.status} ${response.statusText}`);
+    }
+
+    return response.blob();
+  };
+
+  const downloadFileWithWatermark = async (
+    attachmentIndex: number,
+    fileName: string,
+  ) => {
     try {
-      console.log('Открываем файл в модальном окне:', { hasData: fileData.length > 0 });
-      
-      // Проверяем, что данные не пустые
-      if (!fileData || fileData.length === 0) {
-        throw new Error('Файл пустой или не найден');
-      }
-      
-      let fileType = 'application/octet-stream';
-      let displayName = fileName || 'Файл';
-      
-      // Если это base64 данные
-      if (fileData.startsWith('data:')) {
-        // Определяем MIME тип
-        const mimeMatch = fileData.match(/data:([^;]+);/);
-        fileType = mimeMatch?.[1] ?? 'application/octet-stream';
-        
-        console.log('MIME тип для открытия:', fileType);
-        
-        // Проверяем, можно ли отобразить файл в браузере
-        const canDisplayInBrowser = 
-          fileType.startsWith('image/') || 
-          fileType === 'application/pdf' ||
-          fileType.startsWith('text/') ||
-          fileType === 'application/json';
-        
-        if (canDisplayInBrowser) {
-          // Устанавливаем данные файла для модального окна
-          setCurrentFile({
-            data: fileData,
-            name: displayName,
-            type: fileType
-          });
-          setIsFileModalOpen(true);
-        } else {
-          // Для файлов, которые нельзя отобразить в браузере (презентации, архивы и т.д.)
-          // автоматически скачиваем их
-          console.log('Файл не может быть отображен в браузере, скачиваем:', fileType);
-          downloadFile(fileData, displayName);
-        }
-      } else {
-        // Обычная ссылка - открываем в новой вкладке
-        window.open(fileData, '_blank');
-      }
+      const blob = await fetchAttachmentBlob(attachmentIndex, true);
+      const finalName = fileName.replace(/\.[^/.]+$/, "_watermarked$&");
+      downloadBlob(blob, finalName);
     } catch (error) {
-      console.error('Ошибка открытия файла:', error);
-      alert('Ошибка при открытии файла: ' + (error instanceof Error ? error.message : String(error)));
+      console.error("Ошибка скачивания файла с водяным знаком:", error);
+      alert(
+        "Ошибка при скачивании файла с водяным знаком: " +
+          (error instanceof Error ? error.message : String(error)),
+      );
     }
   };
+
+  const openFile = async (attachment: StoredAttachment, index: number) => {
+    try {
+      const blob = await fetchAttachmentBlob(index, false);
+      const fileType = attachment.mimeType || "application/octet-stream";
+      const canDisplayInBrowser =
+        fileType.startsWith("image/") ||
+        fileType === "application/pdf" ||
+        fileType.startsWith("text/") ||
+        fileType === "application/json";
+
+      if (canDisplayInBrowser) {
+        const url = URL.createObjectURL(blob);
+        let text: string | undefined;
+        if (fileType.startsWith("text/") || fileType === "application/json") {
+          text = await blob.text();
+        }
+        setCurrentFile({
+          url,
+          text,
+          name: attachment.originalName,
+          type: fileType,
+          size: attachment.size,
+        });
+        setIsFileModalOpen(true);
+        return;
+      }
+
+      downloadBlob(blob, attachment.originalName);
+    } catch (error) {
+      console.error("Ошибка открытия файла:", error);
+      alert(
+        "Ошибка при открытии файла: " +
+          (error instanceof Error ? error.message : String(error)),
+      );
+    }
+  };
+
+  const downloadFile = async (attachment: StoredAttachment, index: number) => {
+    try {
+      const blob = await fetchAttachmentBlob(index, false);
+      downloadBlob(blob, attachment.originalName);
+    } catch (error) {
+      console.error("Ошибка скачивания файла:", error);
+      alert(
+        "Ошибка при скачивании файла: " +
+          (error instanceof Error ? error.message : String(error)),
+      );
+    }
+  };
+
+  const [progress, setProgress] = useState(0);
+
+  useEffect(() => {
+    if (!isLoading) return;
+    
+    const interval = setInterval(() => {
+      setProgress((prev) => {
+        if (prev >= 100) {
+          return 0;
+        }
+        return prev + 2;
+      });
+    }, 100);
+
+    return () => clearInterval(interval);
+  }, [isLoading]);
 
   if (isLoading) {
     return (
-      <div className="space-y-6">
-        <div className="flex items-center gap-4">
-          <Skeleton className="h-10 w-10" />
-          <Skeleton className="h-8 w-48" />
+      <div className="flex h-full w-full items-center justify-center">
+        <div className="w-full max-w-md space-y-2 px-4">
+          <div className="flex items-center justify-between text-sm">
+            <span className="text-muted-foreground">Загрузка...</span>
+            <span className="font-medium">{progress}%</span>
+          </div>
+          <Progress value={progress} className="w-full" />
         </div>
-        <Card>
-          <CardHeader>
-            <Skeleton className="h-6 w-3/4" />
-            <Skeleton className="h-4 w-1/2" />
-          </CardHeader>
-          <CardContent>
-            <Skeleton className="h-64 w-full" />
-          </CardContent>
-        </Card>
       </div>
     );
   }
@@ -332,176 +311,198 @@ export default function ProjectPage({ params }: ProjectPageProps) {
     );
   }
 
+  // Функции для карусели
+  const nextImage = () => {
+    if (!displayProject?.images || displayProject.images.length === 0) return;
+    setCurrentImageIndex((prev) => (prev + 1) % (displayProject.images?.length ?? 1));
+  };
+
+  const prevImage = () => {
+    if (!displayProject?.images || displayProject.images.length === 0) return;
+    setCurrentImageIndex((prev) => (prev - 1 + (displayProject.images?.length ?? 1)) % (displayProject.images?.length ?? 1));
+  };
+
   return (
     <>
-      <div className="space-y-6 pb-52">
-        <div className="flex items-center gap-4">
-          <div className="flex-1">
-            <h1 className="text-2xl font-bold">{displayProject.title}</h1>
-            {displayProject.featured && (
-              <div className="mt-1">
-                <Badge variant="default">⭐ Рекомендуемый</Badge>
+      <div className="flex flex-col md:flex-row gap-6 min-h-[calc(100vh-12rem)] pb-52">
+        {/* Левая колонка - Изображения с каруселью (50%) */}
+        <div className="w-full md:w-1/2 flex-shrink-0">
+          {displayProject.images && displayProject.images.length > 0 ? (
+            <div className="relative w-full h-full min-h-[400px] bg-muted rounded-lg overflow-hidden">
+              {/* Основное изображение */}
+              <img
+                src={(displayProject.images[currentImageIndex] as StoredImage).url}
+                alt={`${displayProject.title} - изображение ${currentImageIndex + 1}`}
+                className="w-full h-full object-cover"
+                loading="lazy"
+                decoding="async"
+                onError={(e) => {
+                  const target = e.target as HTMLImageElement;
+                  target.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAwIiBoZWlnaHQ9IjMwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjZjNmNGY2Ii8+PHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtZmFtaWx5PSJBcmlhbCIgZm9udC1zaXplPSIxNCIgZmlsbD0iIzY2NjY2NiIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZHk9Ii4zZW0iPkltYWdlPC90ZXh0Pjwvc3ZnPg==';
+                }}
+              />
+              
+              {/* Кнопки навигации (если изображений больше одного) */}
+              {displayProject.images.length > 1 && (
+                <>
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    className="absolute left-4 top-1/2 -translate-y-1/2 bg-background/80 hover:bg-background"
+                    onClick={prevImage}
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    className="absolute right-4 top-1/2 -translate-y-1/2 bg-background/80 hover:bg-background"
+                    onClick={nextImage}
+                  >
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
+                  
+                  {/* Индикаторы */}
+                  <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-2">
+                    {displayProject.images.map((_, index) => (
+                      <button
+                        key={index}
+                        onClick={() => setCurrentImageIndex(index)}
+                        className={`h-2 rounded-full transition-all ${
+                          index === currentImageIndex 
+                            ? 'w-8 bg-primary' 
+                            : 'w-2 bg-background/50 hover:bg-background/70'
+                        }`}
+                        aria-label={`Перейти к изображению ${index + 1}`}
+                      />
+                    ))}
+                  </div>
+                  
+                  {/* Счетчик изображений */}
+                  <div className="absolute top-4 right-4 bg-background/80 px-3 py-1 rounded-full text-sm">
+                    {currentImageIndex + 1} / {displayProject.images.length}
+                  </div>
+                </>
+              )}
+            </div>
+          ) : (
+            <div className="w-full h-full min-h-[400px] bg-muted rounded-lg flex items-center justify-center">
+              <div className="text-center text-muted-foreground">
+                <ImageIcon className="h-16 w-16 mx-auto mb-2 opacity-50" />
+                <p>Нет изображений</p>
               </div>
-            )}
-          </div>
-          <div className="flex gap-2">
-            <FavoriteButton projectId={displayProject.id} />
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => {
-                try {
+            </div>
+          )}
+        </div>
+
+        {/* Правая колонка - Информация и кнопки (50%) */}
+        <div className="w-full md:w-1/2 flex flex-col space-y-6">
+          {/* Заголовок и кнопки */}
+          <div className="flex items-start justify-between gap-4">
+            <div className="flex-1">
+              <h1 className="text-2xl font-bold">{displayProject.title}</h1>
+              {displayProject.featured && (
+                <div className="mt-1">
+                  <Badge variant="default">⭐ Рекомендуемый</Badge>
+                </div>
+              )}
+            </div>
+            <div className="flex gap-2 flex-shrink-0">
+              <FavoriteButton projectId={displayProject.id} />
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  try {
                     const link = `https://t.me/matibott_bot?startapp=project_${displayProject.id}`;
                     void navigator.clipboard.writeText(link);
                     toast.success("Ссылка для Mini App скопирована");
-                } catch (e) {
-                  toast.error("Не удалось скопировать ссылку");
-                }
-              }}
-              title="Скопировать ссылку"
-            >
-              <Copy className="h-4 w-4 mr-2" />
-              Скопировать
-            </Button>
+                  } catch (e) {
+                    toast.error("Не удалось скопировать ссылку");
+                  }
+                }}
+                title="Скопировать ссылку"
+              >
+                <Copy className="h-4 w-4 mr-2" />
+                Скопировать
+              </Button>
+            </div>
           </div>
-        </div>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Описание проекта</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {displayProject.description && (
-              <p className="text-muted-foreground">{displayProject.description}</p>
-            )}
-            
-            {displayProject.content && (
-              <div className="prose max-w-none">
-                <div dangerouslySetInnerHTML={{ __html: displayProject.content }} />
-              </div>
-            )}
-
-            {displayProject.images && displayProject.images.length > 0 && (
-              <div className="space-y-4">
-                <h3 className="text-lg font-semibold">Изображения</h3>
-                <div className="grid gap-4 md:grid-cols-2">
-                  {displayProject.images.map((image: string, index: number) => (
-                    <div key={index} className="aspect-video overflow-hidden rounded-md">
-                      <img
-                        src={image}
-                        alt={`${displayProject.title} - изображение ${index + 1}`}
-                        className="h-full w-full object-cover"
-                        loading="lazy"
-                        decoding="async"
-                        onError={(e) => {
-                          // Если изображение не загрузилось, показываем placeholder
-                          const target = e.target as HTMLImageElement;
-                          target.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAwIiBoZWlnaHQ9IjMwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjZjNmNGY2Ii8+PHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtZmFtaWx5PSJBcmlhbCIgZm9udC1zaXplPSIxNCIgZmlsbD0iIzY2NjY2NiIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZHk9Ii4zZW0iPkltYWdlPC90ZXh0Pjwvc3ZnPg==';
-                        }}
-                      />
-                    </div>
-                  ))}
+          {/* Описание */}
+          <Card className="flex-1 flex flex-col">
+            <CardHeader>
+              <CardTitle>Описание проекта</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4 flex-1">
+              {displayProject.description && (
+                <p className="text-muted-foreground">{displayProject.description}</p>
+              )}
+              
+              {displayProject.content && (
+                <div className="prose max-w-none">
+                  <div dangerouslySetInnerHTML={{ __html: displayProject.content }} />
                 </div>
-              </div>
-            )}
+              )}
 
             {displayProject.attachments && displayProject.attachments.length > 0 && (
               <div className="space-y-4">
                 <h3 className="text-lg font-semibold">Вложения</h3>
                 <div className="space-y-2">
-                  {displayProject.attachments.map((attachment: string, index: number) => {
-                    // Пытаемся извлечь информацию о файле из base64
-                    let fileName = `attachment_${index + 1}`;
-                    let fileIcon = <File className="h-4 w-4" />;
-                    let mimeType = '';
-                    
-                    // Если это base64 с MIME типом, пытаемся извлечь информацию
-                    if (attachment.startsWith('data:')) {
-                      const mimeMatch = attachment.match(/data:([^;]+);/);
-                      if (mimeMatch?.[1]) {
-                        mimeType = mimeMatch[1];
-                        if (mimeType.startsWith('image/')) {
-                          const extension = mimeType.split('/')[1];
-                          fileName = `image_${index + 1}.${extension || 'jpg'}`;
-                          fileIcon = <Image className="h-4 w-4" />;
-                        } else if (mimeType === 'application/pdf') {
-                          fileName = `document_${index + 1}.pdf`;
-                          fileIcon = <FileText className="h-4 w-4" />;
-                        } else if (mimeType.startsWith('video/')) {
-                          const extension = mimeType.split('/')[1];
-                          fileName = `video_${index + 1}.${extension || 'mp4'}`;
-                          fileIcon = <FileVideo className="h-4 w-4" />;
-                        } else if (mimeType.startsWith('audio/')) {
-                          const extension = mimeType.split('/')[1];
-                          fileName = `audio_${index + 1}.${extension || 'mp3'}`;
-                          fileIcon = <FileAudio className="h-4 w-4" />;
-                        } else if (mimeType.startsWith('text/')) {
-                          const extension = mimeType.split('/')[1];
-                          fileName = `text_${index + 1}.${extension || 'txt'}`;
-                          fileIcon = <FileText className="h-4 w-4" />;
-                        } else if (mimeType.includes('zip') || mimeType.includes('rar')) {
-                          fileName = `archive_${index + 1}.zip`;
-                          fileIcon = <Archive className="h-4 w-4" />;
-                        }
-                      }
-                    }
-                    
-                         return (
-                           <div key={index} className="flex items-center justify-between p-3 border rounded-lg">
-                             <div className="flex items-center gap-3 flex-1 min-w-0">
-                               {fileIcon}
-                               <div className="flex-1 min-w-0">
-                                 <span className="font-medium block truncate" title={fileName}>{fileName}</span>
-                                 <div className="text-xs text-muted-foreground truncate">
-                                   {mimeType && `Тип: ${mimeType}`}
-                                   {attachment.length > 0 && ` • Размер: ${Math.round(attachment.length / 1024)} KB`}
-                                   {attachment.length === 0 && ` • ⚠️ Файл пустой`}
-                                 </div>
-                               </div>
-                             </div>
-                             <div className="flex gap-2">
-                               <Button
-                                 variant="outline"
-                                 size="sm"
-                                 onClick={() => {
-                                   console.log('Открытие файла:', { fileName, mimeType, hasData: attachment.length > 0 });
-                                   openFile(attachment);
-                                 }}
-                                 disabled={attachment.length === 0}
-                                 title="Открыть файл (для презентаций и архивов - скачать)"
-                               >
-                                 <Eye className="h-4 w-4 mr-1" />
-                                 Открыть
-                               </Button>
-                               <Button
-                                 variant="outline"
-                                 size="sm"
-                                 onClick={() => {
-                                   console.log('Скачивание файла:', { fileName, mimeType, hasData: attachment.length > 0 });
-                                   downloadFile(attachment, fileName);
-                                 }}
-                                 disabled={attachment.length === 0}
-                               >
-                                 <Download className="h-4 w-4 mr-1" />
-                                 Скачать
-                               </Button>
-                               <Button
-                                 variant="outline"
-                                 size="sm"
-                                onClick={() => {
-                                   console.log('Скачивание файла с водяным знаком:', { fileName, index });
-                                  void downloadFileWithWatermark(index, fileName);
-                                 }}
-                                 disabled={attachment.length === 0}
-                                 className="bg-gray-50 hover:bg-gray-100"
-                                 title="Скачать файл с водяным знаком '123' (очень прозрачный, почти незаметный)"
-                               >
-                                 <Download className="h-4 w-4 mr-1" />
-                                 С водяным знаком
-                               </Button>
-                             </div>
-                           </div>
-                         );
+                  {displayProject.attachments.map((attachment: StoredAttachment, index: number) => {
+                    const fileName = attachment.originalName || `attachment_${index + 1}`;
+                    const fileIcon = getFileIcon(fileName);
+                    const mimeType = attachment.mimeType || "";
+
+                    return (
+                      <div key={index} className="flex items-center justify-between p-3 border rounded-lg">
+                        <div className="flex items-center gap-3 flex-1 min-w-0">
+                          {fileIcon}
+                          <div className="flex-1 min-w-0">
+                            <span className="font-medium block truncate" title={fileName}>{fileName}</span>
+                            <div className="text-xs text-muted-foreground truncate">
+                              {mimeType && `Тип: ${mimeType}`}
+                              {attachment.size > 0 && ` • Размер: ${Math.round(attachment.size / 1024)} KB`}
+                              {attachment.size === 0 && ` • ⚠️ Файл пустой`}
+                            </div>
+                          </div>
+                        </div>
+                        <div className="flex gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => openFile(attachment, index)}
+                            disabled={attachment.size === 0}
+                            title="Открыть файл (для презентаций и архивов - скачать)"
+                          >
+                            <Eye className="h-4 w-4 mr-1" />
+                            Открыть
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => downloadFile(attachment, index)}
+                            disabled={attachment.size === 0}
+                          >
+                            <Download className="h-4 w-4 mr-1" />
+                            Скачать
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              void downloadFileWithWatermark(index, fileName);
+                            }}
+                            disabled={attachment.size === 0}
+                            className="bg-gray-50 hover:bg-gray-100"
+                            title="Скачать файл с водяным знаком '123' (очень прозрачный, почти незаметный)"
+                          >
+                            <Download className="h-4 w-4 mr-1" />
+                            С водяным знаком
+                          </Button>
+                        </div>
+                      </div>
+                    );
                   })}
                 </div>
               </div>
@@ -536,6 +537,7 @@ export default function ProjectPage({ params }: ProjectPageProps) {
             )}
           </CardContent>
         </Card>
+        </div>
       </div>
       {/* Модальное окно для просмотра файла */}
       <Dialog open={isFileModalOpen} onOpenChange={setIsFileModalOpen}>
@@ -570,14 +572,17 @@ export default function ProjectPage({ params }: ProjectPageProps) {
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
                   <span>Тип: {currentFile.type}</span>
                   <span>•</span>
-                  <span>Размер: {Math.round(currentFile.data.length / 1024)} KB</span>
+                  <span>
+                    Размер:{" "}
+                    {currentFile.size ? `${Math.round(currentFile.size / 1024)} KB` : "—"}
+                  </span>
                 </div>
                 
                 {/* Отображение файла в зависимости от типа */}
                 {currentFile.type.startsWith('image/') ? (
                   <div className="flex justify-center">
                     <img
-                      src={currentFile.data}
+                      src={currentFile.url}
                       alt={currentFile.name}
                       className="max-w-full max-h-[60vh] object-contain rounded-lg"
                     />
@@ -585,7 +590,7 @@ export default function ProjectPage({ params }: ProjectPageProps) {
                 ) : currentFile.type === 'application/pdf' ? (
                   <div className="w-full h-[60vh]">
                     <iframe
-                      src={currentFile.data}
+                      src={currentFile.url}
                       className="w-full h-full border rounded-lg"
                       title={currentFile.name}
                     />
@@ -593,10 +598,7 @@ export default function ProjectPage({ params }: ProjectPageProps) {
                 ) : currentFile.type.startsWith('text/') ? (
                   <div className="bg-muted p-4 rounded-lg">
                     <pre className="whitespace-pre-wrap text-sm overflow-auto max-h-[60vh]">
-                      {currentFile.data.startsWith('data:') 
-                        ? atob(currentFile.data.split(',')[1] || '')
-                        : currentFile.data
-                      }
+                      {currentFile.text}
                     </pre>
                   </div>
                 ) : (
@@ -610,8 +612,8 @@ export default function ProjectPage({ params }: ProjectPageProps) {
                     </div>
                     <Button
                       onClick={() => {
-                        if (currentFile) {
-                          downloadFile(currentFile.data, currentFile.name);
+                        if (currentFile?.url) {
+                          window.open(currentFile.url, "_blank");
                         }
                       }}
                       className="mt-4"

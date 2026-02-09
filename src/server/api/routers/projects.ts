@@ -36,11 +36,11 @@ export const projectsRouter = createTRPCRouter({
         orderBy: [desc(projects.createdAt)],
       });
 
-      // Оптимизируем данные для списка - убираем большие файлы
+      // Оптимизируем данные для списка
       return projectsData.map(project => ({
         ...project,
         images: project.images?.slice(0, 1), // Только первое изображение для превью
-        attachments: project.attachments?.length ? ['metadata:files'] : [], // Только метаданные
+        attachments: [], // Без вложений в списке
       }));
     }),
 
@@ -58,41 +58,6 @@ export const projectsRouter = createTRPCRouter({
           user: true,
         },
       });
-
-      // Оптимизируем данные для ограниченных ресурсов сервера
-      if (project) {
-        // Ограничиваем количество изображений для экономии памяти
-        if (project.images && project.images.length > 2) {
-          project.images = project.images.slice(0, 2);
-        }
-        
-        // Сжимаем изображения на сервере (упрощенная версия)
-        if (project.images && project.images.length > 0) {
-          project.images = project.images.map(image => {
-            if (typeof image === 'string' && image.startsWith('data:')) {
-              // Если изображение слишком большое (>500KB), заменяем на placeholder
-              if (image.length > 500 * 1024) {
-                return 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAwIiBoZWlnaHQ9IjMwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjZjNmNGY2Ii8+PHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtZmFtaWx5PSJBcmlhbCIgZm9udC1zaXplPSIxNCIgZmlsbD0iIzY2NjY2NiIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZHk9Ii4zZW0iPkltYWdlPC90ZXh0Pjwvc3ZnPg==';
-              }
-            }
-            return image;
-          });
-        }
-        
-        // Для файлов показываем только метаданные, не сами файлы
-        if (project.attachments && project.attachments.length > 0) {
-          project.attachments = project.attachments.map((attachment, index) => {
-            if (typeof attachment === 'string' && attachment.startsWith('data:')) {
-              // Извлекаем только MIME тип и размер для отображения
-              const mimeMatch = attachment.match(/data:([^;]+);/);
-              const mimeType = mimeMatch ? mimeMatch[1] : 'application/octet-stream';
-              const size = Math.round(attachment.length / 1024); // KB
-              return `metadata:${mimeType}:${size}:file_${index + 1}`;
-            }
-            return attachment;
-          });
-        }
-      }
 
       return project;
     }),
@@ -153,12 +118,35 @@ export const projectsRouter = createTRPCRouter({
         title: z.string(),
         description: z.string().optional(),
         content: z.string().optional(),
-        images: z.array(z.string()).optional(),
-        attachments: z.array(z.string()).optional(),
+        images: z
+          .array(
+            z.object({
+              key: z.string(),
+              url: z.string().url(),
+              previewUrl: z.string().url().optional(),
+              size: z.number(),
+              mimeType: z.string(),
+              width: z.number().optional(),
+              height: z.number().optional(),
+              originalName: z.string().optional(),
+            }),
+          )
+          .optional(),
+        attachments: z
+          .array(
+            z.object({
+              key: z.string(),
+              size: z.number(),
+              mimeType: z.string(),
+              originalName: z.string(),
+              kind: z.enum(["document", "archive", "audio", "video", "image", "other"]),
+            }),
+          )
+          .optional(),
         categoryId: z.number(),
         status: z.enum(["draft", "published", "archived"]).default("draft"),
         featured: z.boolean().default(false),
-      })
+      }),
     )
     .mutation(async ({ input, ctx }) => {
       if (ctx.user.role !== "admin") {
@@ -179,11 +167,35 @@ export const projectsRouter = createTRPCRouter({
         title: z.string().optional(),
         description: z.string().optional(),
         content: z.string().optional(),
-        images: z.array(z.string()).optional(),
+        images: z
+          .array(
+            z.object({
+              key: z.string(),
+              url: z.string().url(),
+              previewUrl: z.string().url().optional(),
+              size: z.number(),
+              mimeType: z.string(),
+              width: z.number().optional(),
+              height: z.number().optional(),
+              originalName: z.string().optional(),
+            }),
+          )
+          .optional(),
+        attachments: z
+          .array(
+            z.object({
+              key: z.string(),
+              size: z.number(),
+              mimeType: z.string(),
+              originalName: z.string(),
+              kind: z.enum(["document", "archive", "audio", "video", "image", "other"]),
+            }),
+          )
+          .optional(),
         categoryId: z.number().optional(),
         status: z.enum(["draft", "published", "archived"]).optional(),
         featured: z.boolean().optional(),
-      })
+      }),
     )
     .mutation(async ({ input, ctx }) => {
       if (ctx.user.role !== "admin") {

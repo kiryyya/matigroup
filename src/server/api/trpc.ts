@@ -8,15 +8,11 @@
  */
 
 import { initTRPC, TRPCError } from "@trpc/server";
-import { webcrypto } from "crypto";
 import superjson from "superjson";
-import { TelegramWebApps } from "telegram-webapps-types";
 import { ZodError } from "zod";
-import { env } from "~/env";
 
 import { db } from "~/server/db";
-import { users } from "../db/schema";
-import { eq, sql } from "drizzle-orm";
+import { getTelegramUserFromHeaders } from "~/server/telegram-auth";
 
 /**
  * 1. CONTEXT
@@ -31,23 +27,7 @@ import { eq, sql } from "drizzle-orm";
  * @see https://trpc.io/docs/server/context
  */
 export const createTRPCContext = async (opts: { headers: Headers }) => {
-  const initData = opts.headers.get("x-telegram-init-data");
-  if (!initData) {
-    throw new TRPCError({ code: "UNAUTHORIZED" });
-  }
-  const data = Object.fromEntries(new URLSearchParams(initData));
-  const isValid = await isHashValid(data, env.TELEGRAM_BOT_TOKEN);
-
-  if (!isValid) {
-    throw new TRPCError({ code: "UNAUTHORIZED" });
-  }
-
-  const webAppUser = JSON.parse(
-    data.user ?? "null",
-  ) as TelegramWebApps.WebAppUser;
-
-  const user = await chekOrCreateUser(webAppUser);
-
+  const user = await getTelegramUserFromHeaders(opts.headers);
   if (!user) {
     throw new TRPCError({ code: "UNAUTHORIZED" });
   }
@@ -110,69 +90,3 @@ export const createTRPCRouter = t.router;
  * @see https://trpc.io/docs/procedures
  */
 export const procedure = t.procedure;
-
-async function isHashValid(data: Record<string, string>, botToken: string) {
-  const encoder = new TextEncoder();
-
-  const checkString = Object.keys(data)
-    .filter((key) => key !== "hash")
-    .map((key) => `${key}=${data[key]}`)
-    .sort()
-    .join("\n");
-
-  const secretKey = await webcrypto.subtle.importKey(
-    "raw",
-    encoder.encode("WebAppData"),
-    { name: "HMAC", hash: "SHA-256" },
-    true,
-    ["sign"],
-  );
-
-  const secret = await webcrypto.subtle.sign(
-    "HMAC",
-    secretKey,
-    encoder.encode(botToken),
-  );
-
-  const signatureKey = await webcrypto.subtle.importKey(
-    "raw",
-    secret,
-    { name: "HMAC", hash: "SHA-256" },
-    true,
-    ["sign"],
-  );
-
-  const signature = await webcrypto.subtle.sign(
-    "HMAC",
-    signatureKey,
-    encoder.encode(checkString),
-  );
-
-  const hex = Buffer.from(signature).toString("hex");
-
-  return data.hash === hex;
-}
-
-const chekOrCreateUser = async (
-  webAppUser: TelegramWebApps.WebAppUser,
-) => {
-  if (!webAppUser.id) return;
-
-  let user = await db.query.users.findFirst({
-    where: eq(users.telegramId, webAppUser.id.toString()),
-  });
-
-  if (!user) {
-    user = await db
-      .insert(users)
-      .values({
-        telegramId: webAppUser.id.toString(),
-        name: `${webAppUser.first_name} ${webAppUser.last_name}`.trim(),
-        image: webAppUser.photo_url,
-      })
-      .returning()
-      .then((r) => r[0]);
-  }
-
-  return user;
-};

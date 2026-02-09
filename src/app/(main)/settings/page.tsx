@@ -4,30 +4,44 @@ import { api } from "~/trpc/react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "~/components/ui/card";
 import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
-import { Skeleton } from "~/components/ui/skeleton";
+import { Progress } from "~/components/ui/progress";
 import { Plus, Search } from "lucide-react";
 import CreateProjectModal from "~/components/create-project-modal";
 import UserSearchModal from "~/components/user-search-modal";
 import { useModal } from "~/contexts/modal-context";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 export default function Settings() {
   const { data: user, isLoading } = api.tg.getUser.useQuery();
   const { isModalOpen, setIsModalOpen } = useModal();
   const [isUserSearchOpen, setIsUserSearchOpen] = useState(false);
+  const [progress, setProgress] = useState(0);
+
+  useEffect(() => {
+    if (!isLoading) return;
+    
+    const interval = setInterval(() => {
+      setProgress((prev) => {
+        if (prev >= 100) {
+          return 0;
+        }
+        return prev + 2;
+      });
+    }, 100);
+
+    return () => clearInterval(interval);
+  }, [isLoading]);
 
   if (isLoading) {
     return (
-      <div className="space-y-6">
-        <h1 className="text-2xl font-bold">Настройки</h1>
-        <Card>
-          <CardHeader>
-            <Skeleton className="h-6 w-32" />
-          </CardHeader>
-          <CardContent>
-            <Skeleton className="h-4 w-48" />
-          </CardContent>
-        </Card>
+      <div className="flex h-full w-full items-center justify-center">
+        <div className="w-full max-w-md space-y-2 px-4">
+          <div className="flex items-center justify-between text-sm">
+            <span className="text-muted-foreground">Загрузка...</span>
+            <span className="font-medium">{progress}%</span>
+          </div>
+          <Progress value={progress} className="w-full" />
+        </div>
       </div>
     );
   }

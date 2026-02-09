@@ -15,6 +15,13 @@ import { Dialog, DialogDescription, DialogHeader, DialogTitle, DialogPortal, Dia
 import { Progress } from "~/components/ui/progress";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { cn } from "~/lib/utils";
+import type { StoredAttachment, StoredImage } from "~/types/files";
+import {
+  classifyAttachment,
+  createImagePreview,
+  getImageDimensions,
+  uploadFile,
+} from "~/lib/upload";
 
 const projectSchema = z.object({
   title: z.string().min(1, "Название обязательно"),
@@ -45,16 +52,18 @@ export default function CreateProjectModal({ isOpen, onClose }: CreateProjectMod
     },
   });
 
-  const [images, setImages] = useState<string[]>([]);
-  const [imageFiles, setImageFiles] = useState<File[]>([]);
+  const [images, setImages] = useState<StoredImage[]>([]);
   const [links, setLinks] = useState<string[]>([]);
-  const [attachments, setAttachments] = useState<string[]>([]);
-  const [attachmentFiles, setAttachmentFiles] = useState<File[]>([]);
-  const [attachmentMetadata, setAttachmentMetadata] = useState<Array<{name: string, size: number, type: string}>>([]);
+  const [attachments, setAttachments] = useState<StoredAttachment[]>([]);
   const [isSaving, setIsSaving] = useState(false);
   const [saveProgress, setSaveProgress] = useState(0);
   const [saveStatus, setSaveStatus] = useState("");
   const [isProcessingImages, setIsProcessingImages] = useState(false);
+  const [uploadCount, setUploadCount] = useState(0);
+
+  const isUploadingFiles = uploadCount > 0;
+  const startUpload = () => setUploadCount((count) => count + 1);
+  const endUpload = () => setUploadCount((count) => Math.max(0, count - 1));
 
   const {
     register,
@@ -117,11 +126,8 @@ export default function CreateProjectModal({ isOpen, onClose }: CreateProjectMod
       // Сброс формы
       reset();
       setImages([]);
-      setImageFiles([]);
       setLinks([]);
       setAttachments([]);
-      setAttachmentFiles([]);
-      setAttachmentMetadata([]);
       
       onClose();
     } catch (error) {
@@ -145,41 +151,58 @@ export default function CreateProjectModal({ isOpen, onClose }: CreateProjectMod
         const files = (e.target as HTMLInputElement).files;
         if (files) {
           const fileArray = Array.from(files);
-          setImageFiles(prev => [...prev, ...fileArray]);
-          
-        // Асинхронная обработка файлов
-        const processFiles = async () => {
-          setIsProcessingImages(true);
-          try {
-            for (const file of fileArray) {
-              // Проверяем размер файла (максимум 2MB для быстрой обработки)
-              if (file.size > 2 * 1024 * 1024) {
-                alert(`Файл ${file.name} слишком большой. Максимальный размер: 2MB`);
-                continue;
+
+          const processFiles = async () => {
+            setIsProcessingImages(true);
+            startUpload();
+            try {
+              for (const file of fileArray) {
+                if (file.size > 5 * 1024 * 1024) {
+                  alert(`Файл ${file.name} слишком большой. Максимальный размер: 5MB`);
+                  continue;
+                }
+
+                const { width, height } = await getImageDimensions(file);
+                const previewBlob = await createImagePreview(file, {
+                  maxWidth: 600,
+                  maxHeight: 600,
+                  quality: 0.7,
+                });
+                const previewFile = new File(
+                  [previewBlob],
+                  `preview-${file.name}`,
+                  { type: "image/jpeg" },
+                );
+
+                const [originalUpload, previewUpload] = await Promise.all([
+                  uploadFile({ file, kind: "image", variant: "original" }),
+                  uploadFile({ file: previewFile, kind: "image", variant: "preview" }),
+                ]);
+
+                setImages((prev) => [
+                  ...prev,
+                  {
+                    key: originalUpload.key,
+                    url: originalUpload.url,
+                    previewUrl: previewUpload.url,
+                    size: originalUpload.size,
+                    mimeType: originalUpload.mimeType,
+                    width,
+                    height,
+                    originalName: originalUpload.originalName,
+                  },
+                ]);
               }
-              
-              try {
-                const compressedImage = await compressImage(file);
-                setImages(prev => [...prev, compressedImage]);
-              } catch (error) {
-                console.error('Ошибка сжатия изображения:', error);
-                // Fallback к обычному base64
-                const reader = new FileReader();
-                reader.onload = (e) => {
-                  const result = e.target?.result as string;
-                  if (result) {
-                    setImages(prev => [...prev, result]);
-                  }
-                };
-                reader.readAsDataURL(file);
-              }
+            } catch (error) {
+              console.error("Ошибка загрузки изображения:", error);
+              alert("Не удалось загрузить изображение");
+            } finally {
+              setIsProcessingImages(false);
+              endUpload();
             }
-          } finally {
-            setIsProcessingImages(false);
-          }
-        };
-        
-        void processFiles();
+          };
+
+          void processFiles();
         }
       };
       input.click();
@@ -188,7 +211,6 @@ export default function CreateProjectModal({ isOpen, onClose }: CreateProjectMod
 
   const removeImage = (index: number) => {
     setImages(images.filter((_, i) => i !== index));
-    setImageFiles(imageFiles.filter((_, i) => i !== index));
   };
 
   const addLink = () => {
@@ -209,30 +231,38 @@ export default function CreateProjectModal({ isOpen, onClose }: CreateProjectMod
     input.accept = '*/*'; // Разрешаем любые файлы
     input.onchange = (e) => {
       const files = (e.target as HTMLInputElement).files;
-      console.log('Выбранные файлы:', files);
       if (files) {
         const fileArray = Array.from(files);
-        console.log('Массив файлов:', fileArray);
-        setAttachmentFiles(prev => [...prev, ...fileArray]);
-        
-        // Сохраняем метаданные файлов
-        const metadata = fileArray.map(file => ({
-          name: file.name,
-          size: file.size,
-          type: file.type
-        }));
-        setAttachmentMetadata(prev => [...prev, ...metadata]);
-        
-        fileArray.forEach(file => {
-          const reader = new FileReader();
-          reader.onload = (e) => {
-            const result = e.target?.result as string;
-            if (result) {
-              setAttachments(prev => [...prev, result]);
+        const uploadAttachments = async () => {
+          startUpload();
+          try {
+            for (const file of fileArray) {
+              if (file.size > 25 * 1024 * 1024) {
+                alert(`Файл ${file.name} слишком большой. Максимальный размер: 25MB`);
+                continue;
+              }
+              const uploaded = await uploadFile({ file, kind: "attachment" });
+              const kind = classifyAttachment(file.type || "", file.name);
+              setAttachments((prev) => [
+                ...prev,
+                {
+                  key: uploaded.key,
+                  size: uploaded.size,
+                  mimeType: uploaded.mimeType,
+                  originalName: uploaded.originalName,
+                  kind,
+                },
+              ]);
             }
-          };
-          reader.readAsDataURL(file);
-        });
+          } catch (error) {
+            console.error("Ошибка загрузки файла:", error);
+            alert("Не удалось загрузить файл");
+          } finally {
+            endUpload();
+          }
+        };
+
+        void uploadAttachments();
       }
     };
     input.click();
@@ -240,52 +270,6 @@ export default function CreateProjectModal({ isOpen, onClose }: CreateProjectMod
 
   const removeAttachment = (index: number) => {
     setAttachments(attachments.filter((_, i) => i !== index));
-    setAttachmentFiles(attachmentFiles.filter((_, i) => i !== index));
-    setAttachmentMetadata(attachmentMetadata.filter((_, i) => i !== index));
-  };
-
-  // Функция сжатия изображений
-  const compressImage = (file: File): Promise<string> => {
-    return new Promise((resolve, reject) => {
-      const canvas = document.createElement('canvas');
-      const ctx = canvas.getContext('2d');
-      const img = document.createElement('img');
-      
-      img.onload = () => {
-        try {
-          // Устанавливаем максимальный размер (меньше для быстрой обработки)
-          const maxWidth = 600;
-          const maxHeight = 400;
-          let { width, height } = img;
-          
-          if (width > height) {
-            if (width > maxWidth) {
-              height = (height * maxWidth) / width;
-              width = maxWidth;
-            }
-          } else {
-            if (height > maxHeight) {
-              width = (width * maxHeight) / height;
-              height = maxHeight;
-            }
-          }
-          
-          canvas.width = width;
-          canvas.height = height;
-          
-          ctx?.drawImage(img, 0, 0, width, height);
-          
-          // Сжимаем до 70% качества для быстрой обработки
-          const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.7);
-          resolve(compressedDataUrl);
-        } catch (error) {
-          reject(error);
-        }
-      };
-      
-      img.onerror = () => reject(new Error('Ошибка загрузки изображения'));
-      img.src = URL.createObjectURL(file);
-    });
   };
 
   const getFileIcon = (fileName: string) => {
@@ -333,7 +317,7 @@ export default function CreateProjectModal({ isOpen, onClose }: CreateProjectMod
 
   return (
     <Dialog open={isOpen}>
-      <CustomDialogContent className="max-w-2xl max-h-full overflow-y-auto pt-28 pb-4">
+      <CustomDialogContent className="max-w-2xl max-h-full overflow-y-auto pt-28 pb-20">
         <DialogHeader>
           <DialogTitle>Создать новый проект</DialogTitle>
           <DialogDescription>
@@ -398,7 +382,7 @@ export default function CreateProjectModal({ isOpen, onClose }: CreateProjectMod
               {images.map((image, index) => (
                 <div key={index} className="flex items-center gap-2">
                   <Image
-                    src={image}
+                    src={image.previewUrl ?? image.url}
                     alt={`Изображение ${index + 1}`}
                     width={64}
                     height={64}
@@ -420,7 +404,7 @@ export default function CreateProjectModal({ isOpen, onClose }: CreateProjectMod
                   type="button"
                   variant="outline"
                   onClick={addImage}
-                  disabled={isProcessingImages}
+                  disabled={isProcessingImages || isUploadingFiles}
                   className="w-full"
                 >
                   {isProcessingImages ? (
@@ -473,10 +457,10 @@ export default function CreateProjectModal({ isOpen, onClose }: CreateProjectMod
           <div className="space-y-2">
             <Label>Вложения (любые файлы)</Label>
             <div className="space-y-2">
-              {attachmentFiles.map((file, index) => (
+              {attachments.map((file, index) => (
                 <div key={index} className="flex items-center gap-2">
-                  {getFileIcon(file.name)}
-                  <span className="flex-1 text-sm truncate">{file.name}</span>
+                  {getFileIcon(file.originalName)}
+                  <span className="flex-1 text-sm truncate">{file.originalName}</span>
                   <span className="text-xs text-muted-foreground">
                     {(file.size / 1024 / 1024).toFixed(2)} MB
                   </span>
@@ -520,13 +504,13 @@ export default function CreateProjectModal({ isOpen, onClose }: CreateProjectMod
               variant="outline"
               onClick={onClose}
               className="flex-1"
-              disabled={isSaving}
+              disabled={isSaving || isUploadingFiles}
             >
               Отмена
             </Button>
             <Button
               type="submit"
-              disabled={isSaving || createProject.isPending}
+              disabled={isSaving || createProject.isPending || isUploadingFiles}
               className="flex-1"
             >
               {isSaving ? "Сохранение..." : createProject.isPending ? "Сохранение..." : "Сохранить проект"}

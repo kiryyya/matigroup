@@ -79,7 +79,7 @@ export async function addWatermarkToPDF(
  * Добавляет водяной знак в PowerPoint презентацию
  */
 export async function addWatermarkToPresentation(
-  pptxBuffer: Buffer,
+  sourceBuffer: Buffer,
   options: Partial<WatermarkOptions> = {}
 ): Promise<Buffer> {
   const watermarkOptions = { ...DEFAULT_WATERMARK_OPTIONS, ...options };
@@ -125,13 +125,12 @@ export async function addWatermarkToPresentation(
     pptx.title = `Документ с водяным знаком - ${watermarkOptions.text}`;
     
     // Генерируем презентацию
-    const pptxBuffer = await pptx.writeFile();
-    
-    return Buffer.from(pptxBuffer);
+    const renderedBuffer = (await pptx.write("nodebuffer")) as ArrayBuffer;
+    return Buffer.from(renderedBuffer);
   } catch (error) {
     console.error('Ошибка при добавлении водяного знака в презентацию:', error);
     // Если не удалось создать презентацию с водяным знаком, возвращаем оригинальный файл
-    return pptxBuffer;
+    return sourceBuffer;
   }
 }
 

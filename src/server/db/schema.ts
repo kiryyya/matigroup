@@ -9,6 +9,7 @@ import {
   timestamp,
   varchar,
 } from "drizzle-orm/pg-core";
+import type { StoredAttachment, StoredImage } from "~/types/files";
 
 /**
  * This is an example of how to use the multi-project schema feature of Drizzle ORM. Use the same
@@ -62,8 +63,8 @@ export const projects = createTable("projects", {
   title: varchar("title", { length: 255 }).notNull(),
   description: text("description"),
   content: text("content"), // detailed description
-  images: json("images").$type<string[]>(),
-  attachments: json("attachments").$type<string[]>(),
+  images: json("images").$type<StoredImage[]>().default([]),
+  attachments: json("attachments").$type<StoredAttachment[]>().default([]),
   categoryId: integer("category_id")
     .notNull()
     .references(() => categories.id, { onDelete: "cascade" }),

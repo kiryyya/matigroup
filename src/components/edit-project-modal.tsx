@@ -13,6 +13,13 @@ import { Dialog, DialogDescription, DialogHeader, DialogTitle, DialogPortal, Dia
 import { Progress } from "~/components/ui/progress";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { cn } from "~/lib/utils";
+import type { StoredAttachment, StoredImage } from "~/types/files";
+import {
+  classifyAttachment,
+  createImagePreview,
+  getImageDimensions,
+  uploadFile,
+} from "~/lib/upload";
 
 type EditableProject = {
   id: number;
@@ -20,8 +27,8 @@ type EditableProject = {
   description?: string | null;
   content?: string | null;
   categoryId: number;
-  images?: string[] | null;
-  attachments?: string[] | null;
+  images?: StoredImage[] | null;
+  attachments?: StoredAttachment[] | null;
   featured?: boolean | null;
   status?: "draft" | "published" | "archived" | null;
 };
@@ -50,12 +57,17 @@ export default function EditProjectModal({ isOpen, onClose, project }: EditProje
     },
   });
 
-  const [images, setImages] = useState<string[]>([]);
+  const [images, setImages] = useState<StoredImage[]>([]);
   const [links, setLinks] = useState<string[]>([]);
-  const [attachments, setAttachments] = useState<string[]>([]);
+  const [attachments, setAttachments] = useState<StoredAttachment[]>([]);
   const [isSaving, setIsSaving] = useState(false);
   const [saveProgress, setSaveProgress] = useState(0);
   const [saveStatus, setSaveStatus] = useState("");
+  const [uploadCount, setUploadCount] = useState(0);
+
+  const isUploadingFiles = uploadCount > 0;
+  const startUpload = () => setUploadCount((count) => count + 1);
+  const endUpload = () => setUploadCount((count) => Math.max(0, count - 1));
 
   const { register, handleSubmit, reset } = useForm<{ title: string; description?: string; content?: string; categoryId: number }>();
 
@@ -94,7 +106,7 @@ export default function EditProjectModal({ isOpen, onClose, project }: EditProje
         content: data.content,
         categoryId: data.categoryId,
         images: images,
-        // attachments обновление опционально, если нужно — можно добавить на сервере
+        attachments: attachments,
       });
 
       setSaveProgress(100);
@@ -125,14 +137,53 @@ export default function EditProjectModal({ isOpen, onClose, project }: EditProje
       const files = (e.target as HTMLInputElement).files;
       if (files) {
         const fileArray = Array.from(files);
-        fileArray.forEach(file => {
-          const reader = new FileReader();
-          reader.onload = (ev) => {
-            const result = ev.target?.result as string;
-            if (result) setImages(prev => [...prev, result]);
-          };
-          reader.readAsDataURL(file);
-        });
+        const processFiles = async () => {
+          startUpload();
+          try {
+            for (const file of fileArray) {
+              if (file.size > 5 * 1024 * 1024) {
+                alert(`Файл ${file.name} слишком большой. Максимальный размер: 5MB`);
+                continue;
+              }
+              const { width, height } = await getImageDimensions(file);
+              const previewBlob = await createImagePreview(file, {
+                maxWidth: 600,
+                maxHeight: 600,
+                quality: 0.7,
+              });
+              const previewFile = new File(
+                [previewBlob],
+                `preview-${file.name}`,
+                { type: "image/jpeg" },
+              );
+
+              const [originalUpload, previewUpload] = await Promise.all([
+                uploadFile({ file, kind: "image", variant: "original" }),
+                uploadFile({ file: previewFile, kind: "image", variant: "preview" }),
+              ]);
+
+              setImages((prev) => [
+                ...prev,
+                {
+                  key: originalUpload.key,
+                  url: originalUpload.url,
+                  previewUrl: previewUpload.url,
+                  size: originalUpload.size,
+                  mimeType: originalUpload.mimeType,
+                  width,
+                  height,
+                  originalName: originalUpload.originalName,
+                },
+              ]);
+            }
+          } catch (error) {
+            console.error("Ошибка загрузки изображения:", error);
+            alert("Не удалось загрузить изображение");
+          } finally {
+            endUpload();
+          }
+        };
+        void processFiles();
       }
     };
     input.click();
@@ -151,14 +202,35 @@ export default function EditProjectModal({ isOpen, onClose, project }: EditProje
       const files = (e.target as HTMLInputElement).files;
       if (files) {
         const fileArray = Array.from(files);
-        fileArray.forEach(file => {
-          const reader = new FileReader();
-          reader.onload = (ev) => {
-            const result = ev.target?.result as string;
-            if (result) setAttachments(prev => [...prev, result]);
-          };
-          reader.readAsDataURL(file);
-        });
+        const processFiles = async () => {
+          startUpload();
+          try {
+            for (const file of fileArray) {
+              if (file.size > 25 * 1024 * 1024) {
+                alert(`Файл ${file.name} слишком большой. Максимальный размер: 25MB`);
+                continue;
+              }
+              const uploaded = await uploadFile({ file, kind: "attachment" });
+              const kind = classifyAttachment(file.type || "", file.name);
+              setAttachments((prev) => [
+                ...prev,
+                {
+                  key: uploaded.key,
+                  size: uploaded.size,
+                  mimeType: uploaded.mimeType,
+                  originalName: uploaded.originalName,
+                  kind,
+                },
+              ]);
+            }
+          } catch (error) {
+            console.error("Ошибка загрузки файла:", error);
+            alert("Не удалось загрузить файл");
+          } finally {
+            endUpload();
+          }
+        };
+        void processFiles();
       }
     };
     input.click();
@@ -242,7 +314,13 @@ export default function EditProjectModal({ isOpen, onClose, project }: EditProje
               <div className="space-y-2">
                 {images.map((image, index) => (
                   <div key={index} className="flex items-center gap-2">
-                    <Image src={image} alt={`Изображение ${index + 1}`} width={64} height={64} className="w-16 h-16 object-cover rounded-md" />
+                    <Image
+                      src={image.previewUrl ?? image.url}
+                      alt={`Изображение ${index + 1}`}
+                      width={64}
+                      height={64}
+                      className="w-16 h-16 object-cover rounded-md"
+                    />
                     <span className="flex-1 text-sm truncate">Изображение {index + 1}</span>
                     <Button type="button" variant="outline" size="sm" onClick={() => removeImage(index)}>
                       <X className="h-4 w-4" />
@@ -258,10 +336,10 @@ export default function EditProjectModal({ isOpen, onClose, project }: EditProje
             <div className="space-y-2">
               <Label>Вложения</Label>
               <div className="space-y-2">
-                {attachments.map((_, index) => (
+                {attachments.map((attachment, index) => (
                   <div key={index} className="flex items-center gap-2">
-                    {getFileIcon(`file_${index + 1}`)}
-                    <span className="flex-1 text-sm truncate">Файл {index + 1}</span>
+                    {getFileIcon(attachment.originalName)}
+                    <span className="flex-1 text-sm truncate">{attachment.originalName}</span>
                     <Button type="button" variant="outline" size="sm" onClick={() => removeAttachment(index)}>
                       <X className="h-4 w-4" />
                     </Button>
@@ -284,10 +362,10 @@ export default function EditProjectModal({ isOpen, onClose, project }: EditProje
             )}
 
             <div className="flex gap-2">
-              <Button type="button" variant="outline" onClick={onClose} className="flex-1" disabled={isSaving}>
+              <Button type="button" variant="outline" onClick={onClose} className="flex-1" disabled={isSaving || isUploadingFiles}>
                 Отмена
               </Button>
-              <Button type="submit" disabled={isSaving || updateProject.isPending} className="flex-1">
+              <Button type="submit" disabled={isSaving || updateProject.isPending || isUploadingFiles} className="flex-1">
                 {isSaving || updateProject.isPending ? "Сохранение..." : "Сохранить изменения"}
               </Button>
             </div>

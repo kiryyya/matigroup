@@ -9,31 +9,25 @@ export default function useTelegramStartParam() {
   const [startParam, setStartParam] = useState<string | null>(null);
 
   useEffect(() => {
-    // Получаем start_param/startapp из Telegram WebApp initData
+    // Получаем start_param/startapp ТОЛЬКО из Telegram WebApp initData
+    // URL параметры обрабатываются middleware на сервере (без загрузки главной страницы)
     const getStartParam = () => {
       if (typeof window === "undefined") return null;
       
       try {
-        // Получаем initData из Telegram WebApp
+        // Получаем initData из Telegram WebApp (это доступно только на клиенте)
         const initData = window?.Telegram?.WebApp?.initData || "";
-        console.log('Telegram initData:', initData);
         
         if (initData) {
           const urlParams = new URLSearchParams(initData);
           const startParam = urlParams.get('start_param') ?? urlParams.get('startapp') ?? urlParams.get('start');
-          console.log('Найден start_param:', startParam);
-          return startParam;
+          if (startParam) {
+            console.log('Найден start_param в Telegram WebApp initData:', startParam);
+            return startParam;
+          }
         }
         
-        // Альтернативный способ - проверяем URL параметры
-        const urlParams = new URLSearchParams(window.location.search);
-        const urlStartParam = urlParams.get('startapp') ?? urlParams.get('start');
-        if (urlStartParam) {
-          console.log('Найден start_param в URL:', urlStartParam);
-          return urlStartParam;
-        }
-        
-        // Также проверяем hash параметры (для Telegram WebApp)
+        // Проверяем hash параметры (для Telegram WebApp)
         const hashParams = new URLSearchParams(window.location.hash.substring(1));
         const hashStartParam = hashParams.get('startapp') ?? hashParams.get('start');
         if (hashStartParam) {
@@ -70,40 +64,34 @@ export default function useTelegramStartParam() {
       type = startParamValue;
     }
 
+    // Используем replace вместо push, чтобы не добавлять в историю
     // Небольшая задержка для корректной инициализации роутера
     const timer = setTimeout(() => {
       switch (type) {
         case 'project':
           if (id) {
             console.log('Переход к проекту:', id);
-            router.push(`/project/${id}`);
-          } else {
-            router.push('/');
+            router.replace(`/project/${id}`);
           }
           break;
 
         case 'category':
           if (id) {
             console.log('Переход к категории:', id);
-            router.push(`/category/${id}`);
-          } else {
-            router.push('/');
+            router.replace(`/category/${id}`);
           }
           break;
 
         case 'profile':
-          router.push('/settings');
-          break;
-
         case 'settings':
           console.log('Переход к настройкам');
-          router.push('/settings');
+          router.replace('/settings');
           break;
 
         case 'home':
         case 'main':
           console.log('Переход на главную');
-          router.push('/');
+          router.replace('/');
           break;
 
         default:
@@ -112,7 +100,7 @@ export default function useTelegramStartParam() {
       }
 
       setHasProcessed(true);
-    }, 500);
+    }, 300); // Уменьшена задержка, так как это только для initData
 
     return () => clearTimeout(timer);
   }, [router, hasProcessed]);

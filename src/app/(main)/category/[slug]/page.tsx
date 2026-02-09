@@ -7,10 +7,10 @@ import Link from "next/link";
 // Using native img for robust preview rendering (supports data URLs and any origin)
 import { Input } from "~/components/ui/input";
 import { Search, X } from "lucide-react";
-import { Skeleton } from "~/components/ui/skeleton";
 import FilterModal, { type FilterOptions } from "~/components/filter-modal";
 import FavoriteButton from "~/components/favorite-button";
-import { useState, useMemo } from "react";
+import { Progress } from "~/components/ui/progress";
+import { useState, useMemo, useEffect } from "react";
 
 interface CategoryPageProps {
   params: {
@@ -112,25 +112,32 @@ export default function CategoryPage({ params }: CategoryPageProps) {
   };
 
 
+  const [progress, setProgress] = useState(0);
+
+  useEffect(() => {
+    if (!isLoading) return;
+    
+    const interval = setInterval(() => {
+      setProgress((prev) => {
+        if (prev >= 100) {
+          return 0;
+        }
+        return prev + 2;
+      });
+    }, 100);
+
+    return () => clearInterval(interval);
+  }, [isLoading]);
+
   if (isLoading) {
     return (
-      <div className="space-y-4">
-        <div className="flex items-center gap-2">
-          <span className="text-2xl">{categoryIcon}</span>
-          <h1 className="text-2xl font-bold">{categoryName}</h1>
-        </div>
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {Array.from({ length: 6 }).map((_, i) => (
-            <Card key={i}>
-              <CardHeader>
-                <Skeleton className="h-4 w-3/4" />
-                <Skeleton className="h-3 w-1/2" />
-              </CardHeader>
-              <CardContent>
-                <Skeleton className="h-20 w-full" />
-              </CardContent>
-            </Card>
-          ))}
+      <div className="flex h-full w-full items-center justify-center">
+        <div className="w-full max-w-md space-y-2 px-4">
+          <div className="flex items-center justify-between text-sm">
+            <span className="text-muted-foreground">Загрузка...</span>
+            <span className="font-medium">{progress}%</span>
+          </div>
+          <Progress value={progress} className="w-full" />
         </div>
       </div>
     );
@@ -178,7 +185,7 @@ export default function CategoryPage({ params }: CategoryPageProps) {
                     {/* Фоновое изображение */}
                     <div className="absolute inset-0 z-0">
                       <img
-                        src={project.images?.[0] ?? ''}
+                        src={project.images?.[0]?.previewUrl ?? project.images?.[0]?.url ?? ''}
                         alt={project.title}
                         className="h-full w-full object-cover"
                         loading="lazy"

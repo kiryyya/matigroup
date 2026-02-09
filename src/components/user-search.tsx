@@ -7,7 +7,7 @@ import { Button } from "~/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "~/components/ui/card";
 import { Badge } from "~/components/ui/badge";
 import { Search, User, Mail, Shield } from "lucide-react";
-import { Skeleton } from "~/components/ui/skeleton";
+import { Progress } from "~/components/ui/progress";
 import UserRoleManager from "~/components/user-role-manager";
 
 interface UserSearchProps {
@@ -18,6 +18,7 @@ export default function UserSearch({ onUserSelect }: UserSearchProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const [debouncedQuery, setDebouncedQuery] = useState("");
   const [selectedUser, setSelectedUser] = useState<any>(null);
+  const [progress, setProgress] = useState(0);
 
   // Debounce search query
   useEffect(() => {
@@ -35,6 +36,25 @@ export default function UserSearch({ onUserSelect }: UserSearchProps) {
       staleTime: 30000, // 30 seconds
     }
   );
+
+  // Progress animation for loading
+  useEffect(() => {
+    if (!isLoading) {
+      setProgress(0);
+      return;
+    }
+    
+    const interval = setInterval(() => {
+      setProgress((prev) => {
+        if (prev >= 100) {
+          return 0;
+        }
+        return prev + 2;
+      });
+    }, 100);
+
+    return () => clearInterval(interval);
+  }, [isLoading]);
 
   const handleUserClick = (user: any) => {
     setSelectedUser(user);
@@ -91,21 +111,14 @@ export default function UserSearch({ onUserSelect }: UserSearchProps) {
       )}
 
       {isLoading && debouncedQuery.length > 0 && (
-        <div className="space-y-2">
-          {[...Array(3)].map((_, i) => (
-            <Card key={i}>
-              <CardContent className="p-4">
-                <div className="flex items-center space-x-3">
-                  <Skeleton className="h-10 w-10 rounded-full" />
-                  <div className="space-y-2 flex-1">
-                    <Skeleton className="h-4 w-32" />
-                    <Skeleton className="h-3 w-24" />
-                  </div>
-                  <Skeleton className="h-6 w-16" />
-                </div>
-              </CardContent>
-            </Card>
-          ))}
+        <div className="flex w-full items-center justify-center py-8">
+          <div className="w-full max-w-md space-y-2 px-4">
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-muted-foreground">Поиск...</span>
+              <span className="font-medium">{progress}%</span>
+            </div>
+            <Progress value={progress} className="w-full" />
+          </div>
         </div>
       )}
 

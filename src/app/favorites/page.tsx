@@ -3,14 +3,16 @@
 import { api } from "~/trpc/react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "~/components/ui/card";
 import { Badge } from "~/components/ui/badge";
+import { Progress } from "~/components/ui/progress";
 import { Heart, Calendar, User, MapPin } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 export default function FavoritesPage() {
   const { data: favorites, isLoading } = api.projects.favorites.useQuery();
   const [removingIds, setRemovingIds] = useState<Set<number>>(new Set());
+  const [progress, setProgress] = useState(0);
 
   const removeFromFavorites = api.projects.removeFromFavorites.useMutation({
     onSuccess: () => {
@@ -34,22 +36,30 @@ export default function FavoritesPage() {
     }
   };
 
+  useEffect(() => {
+    if (!isLoading) return;
+    
+    const interval = setInterval(() => {
+      setProgress((prev) => {
+        if (prev >= 100) {
+          return 0;
+        }
+        return prev + 2;
+      });
+    }, 100);
+
+    return () => clearInterval(interval);
+  }, [isLoading]);
+
   if (isLoading) {
     return (
-      <div className="space-y-4">
-        <h1 className="text-2xl font-bold">Избранное</h1>
-        <div className="grid gap-4">
-          {[1, 2, 3].map((i) => (
-            <Card key={i} className="animate-pulse">
-              <CardHeader>
-                <div className="h-4 bg-gray-200 rounded w-1/3"></div>
-                <div className="h-3 bg-gray-200 rounded w-1/2"></div>
-              </CardHeader>
-              <CardContent>
-                <div className="h-20 bg-gray-200 rounded"></div>
-              </CardContent>
-            </Card>
-          ))}
+      <div className="flex h-full w-full items-center justify-center">
+        <div className="w-full max-w-md space-y-2 px-4">
+          <div className="flex items-center justify-between text-sm">
+            <span className="text-muted-foreground">Загрузка...</span>
+            <span className="font-medium">{progress}%</span>
+          </div>
+          <Progress value={progress} className="w-full" />
         </div>
       </div>
     );
@@ -133,7 +143,7 @@ export default function FavoritesPage() {
                 <CardContent>
                   <div className="relative h-48 w-full rounded-lg overflow-hidden">
                     <Image
-                      src={project.images[0]}
+                      src={project.images[0]?.previewUrl ?? project.images[0]?.url ?? ""}
                       alt={project.title}
                       fill
                       className="object-cover"

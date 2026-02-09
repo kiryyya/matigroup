@@ -4,8 +4,7 @@ import { getBaseUrl } from "~/lib/utils";
 import { db } from "~/server/db";
 import { users } from "~/server/db/schema";
 import { bot } from "~/server/telegram";
-
-const SECRET_HASH = "32e58fbahey833349df3383dc910e181";
+import { env } from "~/env";
 
 bot.on("message", async (ctx) => {
   // echo the message
@@ -115,7 +114,7 @@ export const GET = async (req: Request) => {
   const setWebhook = searchParams.get("setWebhook");
 
   if (setWebhook === "true") {
-    const webhookUrl = `${getBaseUrl()}/api/webhooks/telegram?secret_hash=${SECRET_HASH}`;
+    const webhookUrl = `${getBaseUrl()}/api/webhooks/telegram?secret_hash=${env.TELEGRAM_WEBHOOK_SECRET}`;
     console.log("Setting webhook to", webhookUrl);
     await bot.telegram.setWebhook(webhookUrl, {
       drop_pending_updates: true,
@@ -125,7 +124,7 @@ export const GET = async (req: Request) => {
   const hookInfo = await bot.telegram.getWebhookInfo();
   return Response.json({
     ...hookInfo,
-    url: hookInfo.url?.replace(SECRET_HASH, "SECRET_HASH"),
+    url: hookInfo.url?.replace(env.TELEGRAM_WEBHOOK_SECRET, "SECRET_HASH"),
   });
 };
 
@@ -133,7 +132,7 @@ export const POST = async (req: Request) => {
   const { searchParams } = new URL(req.url);
   const secretHash = searchParams.get("secret_hash");
 
-  if (secretHash !== SECRET_HASH) {
+  if (secretHash !== env.TELEGRAM_WEBHOOK_SECRET) {
     return new Response("Unauthorized", { status: 401 });
   }
 

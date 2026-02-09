@@ -35,7 +35,7 @@ CustomDialogContent.displayName = "CustomDialogContent";
 export default function UserSearchModal({ isOpen, onClose }: UserSearchModalProps) {
   return (
     <Dialog open={isOpen}>
-      <CustomDialogContent className="max-w-2xl max-h-full overflow-y-auto pt-28 pb-4">
+      <CustomDialogContent className="max-w-2xl max-h-full overflow-y-auto pt-28 pb-28">
         <DialogHeader>
           <DialogTitle>Поиск пользователей</DialogTitle>
           <DialogDescription>
