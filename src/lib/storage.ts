@@ -30,9 +30,13 @@ export async function uploadPublicObject(input: {
       Body: input.body,
       ContentType: input.contentType,
       CacheControl: "public, max-age=31536000, immutable",
+      // Устанавливаем ACL для публичного доступа (если поддерживается)
+      ACL: "public-read",
     }),
   );
 
+  // Формируем правильный URL для Selectel Object Storage
+  // Формат: https://bucket-name.s3.region.storage.selcloud.ru/key
   return `${STORAGE.publicBaseUrl}/${input.key}`;
 }
 
