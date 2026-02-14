@@ -88,11 +88,11 @@ export default function CreateProjectModal({ isOpen, onClose }: CreateProjectMod
     try {
       await createProject.mutateAsync({
         title: data.title,
-        description: data.description,
-        content: data.content,
+        description: data.description || undefined,
+        content: data.content || undefined,
         categoryId: data.categoryId,
-        images: images,
-        attachments: attachments,
+        images: images.length > 0 ? images : undefined,
+        attachments: attachments.length > 0 ? attachments : undefined,
         status: "published",
         featured: false,
       });
