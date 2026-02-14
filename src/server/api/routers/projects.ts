@@ -27,6 +27,64 @@ function parseImages(images: unknown): StoredImage[] {
   return [];
 }
 
+// Функция для преобразования URL изображений в прокси-URL
+// Если URL указывает на Selectel напрямую (403 ошибка), преобразуем в прокси
+function transformImageUrl(url: string, key: string): string {
+  // Если URL уже прокси, возвращаем как есть
+  if (url.includes('/api/images/')) {
+    return url;
+  }
+  
+  // Если URL указывает на Selectel, преобразуем в прокси
+  // Исправлено: добавлены скобки для правильного приоритета операторов
+  if (url.includes('s3.ru-7.storage.selcloud.ru') || (url.includes('s3.') && url.includes('.storage.selcloud.ru'))) {
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://matigroup-test-bot.ru';
+    return `${baseUrl}/api/images/${key}`;
+  }
+  
+  // Также проверяем другие возможные форматы URL Selectel
+  if (url.includes('storage.selcloud.ru')) {
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://matigroup-test-bot.ru';
+    return `${baseUrl}/api/images/${key}`;
+  }
+  
+  // Иначе возвращаем оригинальный URL
+  return url;
+}
+
+// Функция для преобразования массива изображений
+function transformImages(images: StoredImage[]): StoredImage[] {
+  return images.map(img => {
+    // Преобразуем основной URL
+    const transformedUrl = transformImageUrl(img.url, img.key);
+    
+    // Преобразуем previewUrl, если он есть
+    let transformedPreviewUrl: string | undefined = undefined;
+    if (img.previewUrl) {
+      // Пытаемся найти ключ для preview из previewUrl или формируем из основного ключа
+      let previewKey = img.key;
+      if (img.key.includes('-original-')) {
+        previewKey = img.key.replace('-original-', '-preview-');
+      } else if (img.key.includes('original')) {
+        previewKey = img.key.replace('original', 'preview');
+      } else {
+        // Если не нашли, пытаемся извлечь из previewUrl
+        const urlMatch = img.previewUrl.match(/images\/([^\/]+)/);
+        if (urlMatch) {
+          previewKey = `images/${urlMatch[1]}`;
+        }
+      }
+      transformedPreviewUrl = transformImageUrl(img.previewUrl, previewKey);
+    }
+    
+    return {
+      ...img,
+      url: transformedUrl,
+      previewUrl: transformedPreviewUrl,
+    };
+  });
+}
+
 export const projectsRouter = createTRPCRouter({
   // Get all categories
   categories: procedure.query(async () => {
@@ -62,9 +120,10 @@ export const projectsRouter = createTRPCRouter({
       // Оптимизируем данные для списка
       return projectsData.map(project => {
         const imagesArray = parseImages(project.images);
+        const transformedImages = transformImages(imagesArray);
         return {
           ...project,
-          images: imagesArray.length > 0 ? imagesArray.slice(0, 1) : [], // Только первое изображение для превью
+          images: transformedImages.length > 0 ? transformedImages.slice(0, 1) : [], // Только первое изображение для превью
           attachments: [], // Без вложений в списке
         };
       });
@@ -89,9 +148,10 @@ export const projectsRouter = createTRPCRouter({
         return null;
       }
 
+      const imagesArray = parseImages(project.images);
       return {
         ...project,
-        images: parseImages(project.images),
+        images: transformImages(imagesArray),
       };
     }),
 
@@ -116,9 +176,10 @@ export const projectsRouter = createTRPCRouter({
         return null;
       }
 
+      const imagesArray = parseImages(project.images);
       return {
         ...project,
-        images: parseImages(project.images),
+        images: transformImages(imagesArray),
       };
     }),
 
@@ -137,10 +198,13 @@ export const projectsRouter = createTRPCRouter({
       limit: 6,
     });
 
-    return projectsData.map(project => ({
-      ...project,
-      images: parseImages(project.images),
-    }));
+    return projectsData.map(project => {
+      const imagesArray = parseImages(project.images);
+      return {
+        ...project,
+        images: transformImages(imagesArray),
+      };
+    });
   }),
 
   // Get all projects (for admin)
@@ -157,10 +221,13 @@ export const projectsRouter = createTRPCRouter({
       orderBy: [desc(projects.createdAt)],
     });
 
-    return projectsData.map(project => ({
-      ...project,
-      images: parseImages(project.images),
-    }));
+    return projectsData.map(project => {
+      const imagesArray = parseImages(project.images);
+      return {
+        ...project,
+        images: transformImages(imagesArray),
+      };
+    });
   }),
 
   // Create project (for admin)
@@ -310,9 +377,10 @@ export const projectsRouter = createTRPCRouter({
           },
         });
         if (project) {
+          const imagesArray = parseImages(project.images);
           projectsData.push({
             ...project,
-            images: parseImages(project.images),
+            images: transformImages(imagesArray),
           });
         }
       }
