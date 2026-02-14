@@ -12,11 +12,16 @@ import { useState, useEffect } from "react";
 export default function FavoritesPage() {
   const { data: favorites, isLoading } = api.projects.favorites.useQuery();
   const [removingIds, setRemovingIds] = useState<Set<number>>(new Set());
+  const utils = api.useUtils();
 
   const removeFromFavorites = api.projects.removeFromFavorites.useMutation({
-    onSuccess: () => {
-      // Refetch favorites after successful removal
-      window.location.reload();
+    onSuccess: async () => {
+      // Инвалидируем все связанные запросы
+      await utils.projects.favorites.invalidate();
+      await utils.projects.isFavorite.invalidate();
+      await utils.projects.allProjects.invalidate();
+      await utils.projects.featured.invalidate();
+      await utils.projects.projectsByCategory.invalidate();
     },
   });
 

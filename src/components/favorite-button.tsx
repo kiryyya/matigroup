@@ -11,10 +11,29 @@ interface FavoriteButtonProps {
 
 export default function FavoriteButton({ projectId, className = "" }: FavoriteButtonProps) {
   const [isToggling, setIsToggling] = useState(false);
+  const utils = api.useUtils();
   
-  const { data: isFavorite, refetch } = api.projects.isFavorite.useQuery({ projectId });
-  const addToFavorites = api.projects.addToFavorites.useMutation();
-  const removeFromFavorites = api.projects.removeFromFavorites.useMutation();
+  const { data: isFavorite } = api.projects.isFavorite.useQuery({ projectId });
+  const addToFavorites = api.projects.addToFavorites.useMutation({
+    onSuccess: async () => {
+      // Инвалидируем все связанные запросы
+      await utils.projects.isFavorite.invalidate({ projectId });
+      await utils.projects.favorites.invalidate();
+      await utils.projects.allProjects.invalidate();
+      await utils.projects.featured.invalidate();
+      await utils.projects.projectsByCategory.invalidate();
+    },
+  });
+  const removeFromFavorites = api.projects.removeFromFavorites.useMutation({
+    onSuccess: async () => {
+      // Инвалидируем все связанные запросы
+      await utils.projects.isFavorite.invalidate({ projectId });
+      await utils.projects.favorites.invalidate();
+      await utils.projects.allProjects.invalidate();
+      await utils.projects.featured.invalidate();
+      await utils.projects.projectsByCategory.invalidate();
+    },
+  });
 
   const handleToggle = async (e: React.MouseEvent) => {
     e.preventDefault();
@@ -30,7 +49,6 @@ export default function FavoriteButton({ projectId, className = "" }: FavoriteBu
       } else {
         await addToFavorites.mutateAsync({ projectId });
       }
-      await refetch();
     } catch (error) {
       console.error("Error toggling favorite:", error);
     } finally {

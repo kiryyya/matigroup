@@ -49,6 +49,7 @@ export default function CreateProjectModal({ isOpen, onClose }: CreateProjectMod
       await utils.projects.featured.invalidate();
       await utils.projects.allProjects.invalidate();
       await utils.projects.favorites.invalidate();
+      await utils.projects.projectsByCategory.invalidate();
     },
   });
 
