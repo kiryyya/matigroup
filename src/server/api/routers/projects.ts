@@ -3,6 +3,29 @@ import { createTRPCRouter, procedure } from "../trpc";
 import { z } from "zod";
 import { categories, projects, users } from "~/server/db/schema";
 import { eq, and, desc } from "drizzle-orm";
+import type { StoredImage } from "~/types/files";
+
+// Вспомогательная функция для парсинга изображений из JSON
+function parseImages(images: unknown): StoredImage[] {
+  if (Array.isArray(images)) {
+    return images as StoredImage[];
+  }
+  if (!images) {
+    return [];
+  }
+  try {
+    if (typeof images === 'string') {
+      const parsed = JSON.parse(images) as unknown;
+      return Array.isArray(parsed) ? (parsed as StoredImage[]) : [];
+    }
+    if (typeof images === 'object') {
+      return [images as StoredImage];
+    }
+  } catch (e) {
+    console.error("Error parsing images:", e);
+  }
+  return [];
+}
 
 export const projectsRouter = createTRPCRouter({
   // Get all categories
@@ -37,11 +60,14 @@ export const projectsRouter = createTRPCRouter({
       });
 
       // Оптимизируем данные для списка
-      return projectsData.map(project => ({
-        ...project,
-        images: project.images?.slice(0, 1), // Только первое изображение для превью
-        attachments: [], // Без вложений в списке
-      }));
+      return projectsData.map(project => {
+        const imagesArray = parseImages(project.images);
+        return {
+          ...project,
+          images: imagesArray.length > 0 ? imagesArray.slice(0, 1) : [], // Только первое изображение для превью
+          attachments: [], // Без вложений в списке
+        };
+      });
     }),
 
   // Get single project
@@ -59,7 +85,14 @@ export const projectsRouter = createTRPCRouter({
         },
       });
 
-      return project;
+      if (!project) {
+        return null;
+      }
+
+      return {
+        ...project,
+        images: parseImages(project.images),
+      };
     }),
 
   // Get full project data (with files) - for admin or when needed
@@ -71,18 +104,27 @@ export const projectsRouter = createTRPCRouter({
         throw new Error("Unauthorized");
       }
 
-      return await db.query.projects.findFirst({
+      const project = await db.query.projects.findFirst({
         where: eq(projects.id, input.id),
         with: {
           category: true,
           user: true,
         },
       });
+
+      if (!project) {
+        return null;
+      }
+
+      return {
+        ...project,
+        images: parseImages(project.images),
+      };
     }),
 
   // Get featured projects
   featured: procedure.query(async () => {
-    return await db.query.projects.findMany({
+    const projectsData = await db.query.projects.findMany({
       where: and(
         eq(projects.featured, true),
         eq(projects.status, "published")
@@ -94,6 +136,11 @@ export const projectsRouter = createTRPCRouter({
       orderBy: [desc(projects.createdAt)],
       limit: 6,
     });
+
+    return projectsData.map(project => ({
+      ...project,
+      images: parseImages(project.images),
+    }));
   }),
 
   // Get all projects (for admin)
@@ -102,13 +149,18 @@ export const projectsRouter = createTRPCRouter({
       throw new Error("Unauthorized");
     }
 
-    return await db.query.projects.findMany({
+    const projectsData = await db.query.projects.findMany({
       with: {
         category: true,
         user: true,
       },
       orderBy: [desc(projects.createdAt)],
     });
+
+    return projectsData.map(project => ({
+      ...project,
+      images: parseImages(project.images),
+    }));
   }),
 
   // Create project (for admin)
@@ -258,7 +310,10 @@ export const projectsRouter = createTRPCRouter({
           },
         });
         if (project) {
-          projectsData.push(project);
+          projectsData.push({
+            ...project,
+            images: parseImages(project.images),
+          });
         }
       }
 
