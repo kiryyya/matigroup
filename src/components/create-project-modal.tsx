@@ -109,8 +109,22 @@ export default function CreateProjectModal({ isOpen, onClose }: CreateProjectMod
       onClose();
     } catch (error) {
       console.error("Ошибка создания проекта:", error);
+      const errorMessage = error instanceof Error ? error.message : "Неизвестная ошибка";
       setSaveStatus("Ошибка при создании проекта");
-      alert("Ошибка при создании проекта");
+      
+      // Показываем детальную ошибку
+      let userMessage = "Ошибка при создании проекта";
+      if (errorMessage.includes("Unauthorized") || errorMessage.includes("Forbidden")) {
+        userMessage = "У вас нет прав для создания проекта";
+      } else if (errorMessage.includes("validation") || errorMessage.includes("invalid")) {
+        userMessage = `Ошибка валидации: ${errorMessage}`;
+      } else if (errorMessage.includes("database") || errorMessage.includes("SQL")) {
+        userMessage = "Ошибка базы данных. Проверьте данные проекта";
+      } else if (errorMessage) {
+        userMessage = `Ошибка: ${errorMessage}`;
+      }
+      
+      alert(userMessage);
     } finally {
       setIsSaving(false);
       setSaveStatus("");

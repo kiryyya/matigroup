@@ -153,10 +153,20 @@ export const projectsRouter = createTRPCRouter({
         throw new Error("Unauthorized");
       }
 
-      return await db.insert(projects).values({
-        ...input,
-        userId: ctx.user.id,
-      });
+      try {
+        const result = await db.insert(projects).values({
+          ...input,
+          userId: ctx.user.id,
+        }).returning();
+        
+        return result[0];
+      } catch (error) {
+        console.error("Error creating project:", error);
+        if (error instanceof Error) {
+          throw new Error(`Database error: ${error.message}`);
+        }
+        throw new Error("Failed to create project");
+      }
     }),
 
   // Update project (for admin)
