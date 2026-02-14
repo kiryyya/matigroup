@@ -59,6 +59,8 @@ function transformImages(images: StoredImage[]): StoredImage[] {
     const transformedUrl = transformImageUrl(img.url, img.key);
     
     // Преобразуем previewUrl, если он есть
+    // Если previewUrl указывает на Selectel, преобразуем его
+    // Если preview не найден, API endpoint автоматически вернет original
     let transformedPreviewUrl: string | undefined = undefined;
     if (img.previewUrl) {
       // Пытаемся найти ключ для preview из previewUrl или формируем из основного ключа
@@ -69,12 +71,15 @@ function transformImages(images: StoredImage[]): StoredImage[] {
         previewKey = img.key.replace('original', 'preview');
       } else {
         // Если не нашли, пытаемся извлечь из previewUrl
-        const urlMatch = img.previewUrl.match(/images\/([^\/]+)/);
+        const urlMatch = img.previewUrl.match(/images\/([^\/\?]+)/);
         if (urlMatch) {
           previewKey = `images/${urlMatch[1]}`;
         }
       }
       transformedPreviewUrl = transformImageUrl(img.previewUrl, previewKey);
+    } else {
+      // Если previewUrl нет, используем основной URL как fallback
+      transformedPreviewUrl = transformedUrl;
     }
     
     return {
