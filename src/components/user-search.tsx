@@ -7,7 +7,7 @@ import { Button } from "~/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "~/components/ui/card";
 import { Badge } from "~/components/ui/badge";
 import { Search, User, Mail, Shield } from "lucide-react";
-import { Progress } from "~/components/ui/progress";
+import Loader from "~/components/ui/loader";
 import UserRoleManager from "~/components/user-role-manager";
 
 interface UserSearchProps {
@@ -18,7 +18,6 @@ export default function UserSearch({ onUserSelect }: UserSearchProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const [debouncedQuery, setDebouncedQuery] = useState("");
   const [selectedUser, setSelectedUser] = useState<any>(null);
-  const [progress, setProgress] = useState(0);
 
   // Debounce search query
   useEffect(() => {
@@ -37,24 +36,6 @@ export default function UserSearch({ onUserSelect }: UserSearchProps) {
     }
   );
 
-  // Progress animation for loading
-  useEffect(() => {
-    if (!isLoading) {
-      setProgress(0);
-      return;
-    }
-    
-    const interval = setInterval(() => {
-      setProgress((prev) => {
-        if (prev >= 100) {
-          return 0;
-        }
-        return prev + 2;
-      });
-    }, 100);
-
-    return () => clearInterval(interval);
-  }, [isLoading]);
 
   const handleUserClick = (user: any) => {
     setSelectedUser(user);
@@ -112,13 +93,7 @@ export default function UserSearch({ onUserSelect }: UserSearchProps) {
 
       {isLoading && debouncedQuery.length > 0 && (
         <div className="flex w-full items-center justify-center py-8">
-          <div className="w-full max-w-md space-y-2 px-4">
-            <div className="flex items-center justify-between text-sm">
-              <span className="text-muted-foreground">Поиск...</span>
-              <span className="font-medium">{progress}%</span>
-            </div>
-            <Progress value={progress} className="w-full" />
-          </div>
+          <Loader />
         </div>
       )}
 

@@ -6,6 +6,9 @@ import { addWatermarkToFile } from "~/lib/watermark";
 import { getPrivateObject } from "~/lib/storage";
 import { requireTelegramUser } from "~/server/telegram-auth";
 
+// Force dynamic rendering - don't execute during build
+export const dynamic = 'force-dynamic';
+
 interface RouteParams {
   params: {
     id: string;
@@ -83,24 +86,27 @@ export async function GET(
     const s3Object = await getPrivateObject({ key: fileKey });
     if (!s3Object.Body) {
       return NextResponse.json({ error: "File not found" }, { status: 404 });
-    }
+      }
 
     const bodyBuffer = Buffer.from(await s3Object.Body.transformToByteArray());
-    let finalBuffer = bodyBuffer;
+    let finalBuffer: Buffer = bodyBuffer;
 
     if (withWatermark) {
       try {
-        finalBuffer = await addWatermarkToFile(bodyBuffer, mimeType, {
+        const watermarked = await addWatermarkToFile(bodyBuffer, mimeType, {
           text: "123",
           opacity: 0.5,
           fontSize: 16,
         });
+        finalBuffer = Buffer.isBuffer(watermarked) 
+          ? watermarked 
+          : Buffer.from(watermarked);
       } catch (error) {
         console.error("Ошибка при добавлении водяного знака:", error);
         finalBuffer = bodyBuffer;
       }
     }
-
+    
     return new NextResponse(finalBuffer as BodyInit, {
       status: 200,
       headers: {

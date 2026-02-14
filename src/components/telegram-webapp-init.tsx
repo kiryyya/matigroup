@@ -24,7 +24,7 @@ export default function TelegramWebAppInit() {
       
       // Расширяем viewport на весь экран
       try {
-        tg.expand();
+      tg.expand();
       } catch (error) {
         console.warn("Telegram WebApp expand failed:", error);
       }

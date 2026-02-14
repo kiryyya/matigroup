@@ -6,6 +6,9 @@ import { users } from "~/server/db/schema";
 import { bot } from "~/server/telegram";
 import { env } from "~/env";
 
+// Force dynamic rendering - don't execute during build
+export const dynamic = 'force-dynamic';
+
 bot.on("message", async (ctx) => {
   // echo the message
   await checkChatId(ctx);

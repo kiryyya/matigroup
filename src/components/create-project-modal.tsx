@@ -12,7 +12,7 @@ import React, { useState } from "react";
 import { Plus, X, Upload, FileText, Link as LinkIcon, File, Image as ImageIcon, FileVideo, FileAudio, Archive } from "lucide-react";
 import Image from "next/image";
 import { Dialog, DialogDescription, DialogHeader, DialogTitle, DialogPortal, DialogOverlay } from "~/components/ui/dialog";
-import { Progress } from "~/components/ui/progress";
+import Loader from "~/components/ui/loader";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { cn } from "~/lib/utils";
 import type { StoredAttachment, StoredImage } from "~/types/files";
@@ -56,7 +56,6 @@ export default function CreateProjectModal({ isOpen, onClose }: CreateProjectMod
   const [links, setLinks] = useState<string[]>([]);
   const [attachments, setAttachments] = useState<StoredAttachment[]>([]);
   const [isSaving, setIsSaving] = useState(false);
-  const [saveProgress, setSaveProgress] = useState(0);
   const [saveStatus, setSaveStatus] = useState("");
   const [isProcessingImages, setIsProcessingImages] = useState(false);
   const [uploadCount, setUploadCount] = useState(0);
@@ -83,30 +82,9 @@ export default function CreateProjectModal({ isOpen, onClose }: CreateProjectMod
     }
 
     setIsSaving(true);
-    setSaveProgress(0);
-    setSaveStatus("Подготовка данных...");
+    setSaveStatus("Сохранение проекта...");
 
     try {
-      // Этап 1: Подготовка данных (20%)
-      setSaveProgress(20);
-      setSaveStatus("Подготовка данных...");
-      await new Promise(resolve => setTimeout(resolve, 300));
-
-      console.log('Создание проекта...', {
-        title: data.title,
-        imagesCount: images.length,
-        attachmentsCount: attachments.length
-      });
-
-      // Этап 2: Валидация (40%)
-      setSaveProgress(40);
-      setSaveStatus("Проверка данных...");
-      await new Promise(resolve => setTimeout(resolve, 200));
-
-      // Этап 3: Сохранение в базу данных (80%)
-      setSaveProgress(60);
-      setSaveStatus("Сохранение проекта...");
-      
       await createProject.mutateAsync({
         title: data.title,
         description: data.description,
@@ -118,8 +96,6 @@ export default function CreateProjectModal({ isOpen, onClose }: CreateProjectMod
         featured: false,
       });
 
-      // Этап 4: Завершение (100%)
-      setSaveProgress(100);
       setSaveStatus("Проект успешно создан!");
       await new Promise(resolve => setTimeout(resolve, 500));
       
@@ -136,7 +112,6 @@ export default function CreateProjectModal({ isOpen, onClose }: CreateProjectMod
       alert("Ошибка при создании проекта");
     } finally {
       setIsSaving(false);
-      setSaveProgress(0);
       setSaveStatus("");
     }
   };
@@ -151,24 +126,29 @@ export default function CreateProjectModal({ isOpen, onClose }: CreateProjectMod
         const files = (e.target as HTMLInputElement).files;
         if (files) {
           const fileArray = Array.from(files);
-
-          const processFiles = async () => {
-            setIsProcessingImages(true);
+          
+        const processFiles = async () => {
+          setIsProcessingImages(true);
             startUpload();
-            try {
-              for (const file of fileArray) {
+          try {
+            for (const file of fileArray) {
                 if (file.size > 5 * 1024 * 1024) {
                   alert(`Файл ${file.name} слишком большой. Максимальный размер: 5MB`);
-                  continue;
-                }
-
+                continue;
+              }
+              
                 const { width, height } = await getImageDimensions(file);
                 const previewBlob = await createImagePreview(file, {
                   maxWidth: 600,
                   maxHeight: 600,
                   quality: 0.7,
                 });
-                const previewFile = new File(
+
+                // Используем глобальный File-конструктор через any,
+                // чтобы избежать проблем типизации при сборке
+                const PreviewFileCtor =
+                  (globalThis as any).File ?? (window as any).File;
+                const previewFile: File = new PreviewFileCtor(
                   [previewBlob],
                   `preview-${file.name}`,
                   { type: "image/jpeg" },
@@ -196,13 +176,13 @@ export default function CreateProjectModal({ isOpen, onClose }: CreateProjectMod
             } catch (error) {
               console.error("Ошибка загрузки изображения:", error);
               alert("Не удалось загрузить изображение");
-            } finally {
-              setIsProcessingImages(false);
+          } finally {
+            setIsProcessingImages(false);
               endUpload();
-            }
-          };
-
-          void processFiles();
+          }
+        };
+        
+        void processFiles();
         }
       };
       input.click();
@@ -259,8 +239,8 @@ export default function CreateProjectModal({ isOpen, onClose }: CreateProjectMod
             alert("Не удалось загрузить файл");
           } finally {
             endUpload();
-          }
-        };
+            }
+          };
 
         void uploadAttachments();
       }
@@ -486,14 +466,13 @@ export default function CreateProjectModal({ isOpen, onClose }: CreateProjectMod
             </div>
           </div>
 
-          {/* Прогресс-бар сохранения */}
+          {/* Индикатор сохранения */}
           {isSaving && (
-            <div className="space-y-2">
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-muted-foreground">{saveStatus}</span>
-                <span className="font-medium">{saveProgress}%</span>
-              </div>
-              <Progress value={saveProgress} className="w-full" />
+            <div className="flex items-center justify-center gap-2 py-4">
+              <Loader size="sm" />
+              {saveStatus && (
+                <span className="text-sm text-muted-foreground">{saveStatus}</span>
+              )}
             </div>
           )}
 

@@ -4,7 +4,7 @@ import { api } from "~/trpc/react";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
-import { Progress } from "~/components/ui/progress";
+import Loader from "~/components/ui/loader";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, Calendar, User, Download, Eye, FileText, Image as ImageIcon, FileVideo, FileAudio, Archive, File, Trash2, X, Pencil, Copy, ChevronLeft, ChevronRight } from "lucide-react";
@@ -130,14 +130,14 @@ export default function ProjectPage({ params }: ProjectPageProps) {
 
   const downloadBlob = (blob: Blob, fileName: string) => {
     try {
-      const url = URL.createObjectURL(blob);
+        const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
-      link.href = url;
-      link.download = fileName;
+        link.href = url;
+        link.download = fileName;
       link.style.display = "none";
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
       setTimeout(() => URL.revokeObjectURL(url), 1000);
     } catch (error) {
       console.error("Ошибка скачивания файла:", error);
@@ -163,13 +163,13 @@ export default function ProjectPage({ params }: ProjectPageProps) {
         },
       },
     );
-
-    if (!response.ok) {
-      const errorText = await response.text();
+      
+      if (!response.ok) {
+        const errorText = await response.text();
       console.error("Ошибка сервера:", errorText);
-      throw new Error(`Ошибка сервера: ${response.status} ${response.statusText}`);
-    }
-
+        throw new Error(`Ошибка сервера: ${response.status} ${response.statusText}`);
+      }
+      
     return response.blob();
   };
 
@@ -194,26 +194,26 @@ export default function ProjectPage({ params }: ProjectPageProps) {
     try {
       const blob = await fetchAttachmentBlob(index, false);
       const fileType = attachment.mimeType || "application/octet-stream";
-      const canDisplayInBrowser =
+        const canDisplayInBrowser = 
         fileType.startsWith("image/") ||
         fileType === "application/pdf" ||
         fileType.startsWith("text/") ||
         fileType === "application/json";
-
-      if (canDisplayInBrowser) {
+        
+        if (canDisplayInBrowser) {
         const url = URL.createObjectURL(blob);
         let text: string | undefined;
         if (fileType.startsWith("text/") || fileType === "application/json") {
           text = await blob.text();
         }
-        setCurrentFile({
+          setCurrentFile({
           url,
           text,
           name: attachment.originalName,
           type: fileType,
           size: attachment.size,
-        });
-        setIsFileModalOpen(true);
+          });
+          setIsFileModalOpen(true);
         return;
       }
 
@@ -240,33 +240,10 @@ export default function ProjectPage({ params }: ProjectPageProps) {
     }
   };
 
-  const [progress, setProgress] = useState(0);
-
-  useEffect(() => {
-    if (!isLoading) return;
-    
-    const interval = setInterval(() => {
-      setProgress((prev) => {
-        if (prev >= 100) {
-          return 0;
-        }
-        return prev + 2;
-      });
-    }, 100);
-
-    return () => clearInterval(interval);
-  }, [isLoading]);
-
   if (isLoading) {
     return (
       <div className="flex h-full w-full items-center justify-center">
-        <div className="w-full max-w-md space-y-2 px-4">
-          <div className="flex items-center justify-between text-sm">
-            <span className="text-muted-foreground">Загрузка...</span>
-            <span className="font-medium">{progress}%</span>
-          </div>
-          <Progress value={progress} className="w-full" />
-        </div>
+        <Loader />
       </div>
     );
   }
@@ -453,56 +430,56 @@ export default function ProjectPage({ params }: ProjectPageProps) {
                     const fileName = attachment.originalName || `attachment_${index + 1}`;
                     const fileIcon = getFileIcon(fileName);
                     const mimeType = attachment.mimeType || "";
-
-                    return (
-                      <div key={index} className="flex items-center justify-between p-3 border rounded-lg">
-                        <div className="flex items-center gap-3 flex-1 min-w-0">
-                          {fileIcon}
-                          <div className="flex-1 min-w-0">
-                            <span className="font-medium block truncate" title={fileName}>{fileName}</span>
-                            <div className="text-xs text-muted-foreground truncate">
-                              {mimeType && `Тип: ${mimeType}`}
+                    
+                         return (
+                           <div key={index} className="flex items-center justify-between p-3 border rounded-lg">
+                             <div className="flex items-center gap-3 flex-1 min-w-0">
+                               {fileIcon}
+                               <div className="flex-1 min-w-0">
+                                 <span className="font-medium block truncate" title={fileName}>{fileName}</span>
+                                 <div className="text-xs text-muted-foreground truncate">
+                                   {mimeType && `Тип: ${mimeType}`}
                               {attachment.size > 0 && ` • Размер: ${Math.round(attachment.size / 1024)} KB`}
                               {attachment.size === 0 && ` • ⚠️ Файл пустой`}
-                            </div>
-                          </div>
-                        </div>
-                        <div className="flex gap-2">
-                          <Button
-                            variant="outline"
-                            size="sm"
+                                 </div>
+                               </div>
+                             </div>
+                             <div className="flex gap-2">
+                               <Button
+                                 variant="outline"
+                                 size="sm"
                             onClick={() => openFile(attachment, index)}
                             disabled={attachment.size === 0}
-                            title="Открыть файл (для презентаций и архивов - скачать)"
-                          >
-                            <Eye className="h-4 w-4 mr-1" />
-                            Открыть
-                          </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
+                                 title="Открыть файл (для презентаций и архивов - скачать)"
+                               >
+                                 <Eye className="h-4 w-4 mr-1" />
+                                 Открыть
+                               </Button>
+                               <Button
+                                 variant="outline"
+                                 size="sm"
                             onClick={() => downloadFile(attachment, index)}
                             disabled={attachment.size === 0}
-                          >
-                            <Download className="h-4 w-4 mr-1" />
-                            Скачать
-                          </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => {
-                              void downloadFileWithWatermark(index, fileName);
-                            }}
+                               >
+                                 <Download className="h-4 w-4 mr-1" />
+                                 Скачать
+                               </Button>
+                               <Button
+                                 variant="outline"
+                                 size="sm"
+                                onClick={() => {
+                                  void downloadFileWithWatermark(index, fileName);
+                                 }}
                             disabled={attachment.size === 0}
-                            className="bg-gray-50 hover:bg-gray-100"
-                            title="Скачать файл с водяным знаком '123' (очень прозрачный, почти незаметный)"
-                          >
-                            <Download className="h-4 w-4 mr-1" />
-                            С водяным знаком
-                          </Button>
-                        </div>
-                      </div>
-                    );
+                                 className="bg-gray-50 hover:bg-gray-100"
+                                 title="Скачать файл с водяным знаком '123' (очень прозрачный, почти незаметный)"
+                               >
+                                 <Download className="h-4 w-4 mr-1" />
+                                 С водяным знаком
+                               </Button>
+                             </div>
+                           </div>
+                         );
                   })}
                 </div>
               </div>

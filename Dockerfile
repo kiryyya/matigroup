@@ -15,15 +15,9 @@ RUN npm ci
 # Copy source code
 COPY . .
 
-# Build arguments for environment variables
-ARG DATABASE_URL
-ARG TELEGRAM_BOT_TOKEN
-ARG SKIP_ENV_VALIDATION
-
-# Set environment variables for build
-ENV DATABASE_URL=${DATABASE_URL}
-ENV TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
-ENV SKIP_ENV_VALIDATION=${SKIP_ENV_VALIDATION}
+# Skip environment validation during build
+# Variables will be provided at runtime in Yandex Cloud
+ENV SKIP_ENV_VALIDATION=true
 
 # Build the application
 RUN npm run build

@@ -2,24 +2,33 @@
  * Run `build` or `dev` with `SKIP_ENV_VALIDATION` to skip env validation. This is especially useful
  * for Docker builds.
  */
-const { env } = await import("./src/env.js");
+let env;
+try {
+  env = await import("./src/env.js");
+} catch (error) {
+  // During Docker build, env might not be available
+  console.warn("Skipping env validation during build");
+  env = { env: {} };
+}
 
 /** @type {import("next").NextConfig} */
 const config = {
   eslint: {
-    // Warning: This allows production builds to successfully complete even if
-    // your project has ESLint errors.
     ignoreDuringBuilds: true,
   },
   images: {
-    // domains: ["images.unsplash.com", "core.telegram.org"],
     remotePatterns: [
       {
         hostname: "core.telegram.org",
       },
-      {
-        hostname: new URL(env.STORAGE_PUBLIC_URL).hostname,
-      },
+      // Only add storage hostname if env is available
+      ...(env.env?.STORAGE_PUBLIC_URL
+        ? [
+            {
+              hostname: new URL(env.env.STORAGE_PUBLIC_URL).hostname,
+            },
+          ]
+        : []),
     ],
   },
 };

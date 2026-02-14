@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireTelegramAdmin } from "~/server/telegram-auth";
 import { uploadPrivateObject, uploadPublicObject } from "~/lib/storage";
 
+// Force dynamic rendering - don't execute during build
+export const dynamic = 'force-dynamic';
+
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
 const MAX_ATTACHMENT_BYTES = 25 * 1024 * 1024;
 

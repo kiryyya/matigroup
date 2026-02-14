@@ -10,7 +10,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { X, Upload, FileText, Link as LinkIcon, File, Image as ImageIcon, FileVideo, FileAudio, Archive } from "lucide-react";
 import Image from "next/image";
 import { Dialog, DialogDescription, DialogHeader, DialogTitle, DialogPortal, DialogOverlay } from "~/components/ui/dialog";
-import { Progress } from "~/components/ui/progress";
+import Loader from "~/components/ui/loader";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { cn } from "~/lib/utils";
 import type { StoredAttachment, StoredImage } from "~/types/files";
@@ -61,7 +61,6 @@ export default function EditProjectModal({ isOpen, onClose, project }: EditProje
   const [links, setLinks] = useState<string[]>([]);
   const [attachments, setAttachments] = useState<StoredAttachment[]>([]);
   const [isSaving, setIsSaving] = useState(false);
-  const [saveProgress, setSaveProgress] = useState(0);
   const [saveStatus, setSaveStatus] = useState("");
   const [uploadCount, setUploadCount] = useState(0);
 
@@ -89,16 +88,9 @@ export default function EditProjectModal({ isOpen, onClose, project }: EditProje
     if (!project) return;
 
     setIsSaving(true);
-    setSaveProgress(0);
-    setSaveStatus("Подготовка данных...");
+    setSaveStatus("Сохранение изменений...");
 
     try {
-      setSaveProgress(40);
-      setSaveStatus("Проверка данных...");
-
-      setSaveProgress(70);
-      setSaveStatus("Сохранение изменений...");
-
       await updateProject.mutateAsync({
         id: project.id,
         title: data.title,
@@ -109,7 +101,6 @@ export default function EditProjectModal({ isOpen, onClose, project }: EditProje
         attachments: attachments,
       });
 
-      setSaveProgress(100);
       setSaveStatus("Проект обновлен!");
       await new Promise(r => setTimeout(r, 400));
       onClose();
@@ -119,7 +110,6 @@ export default function EditProjectModal({ isOpen, onClose, project }: EditProje
       alert("Ошибка при сохранении проекта");
     } finally {
       setIsSaving(false);
-      setSaveProgress(0);
       setSaveStatus("");
     }
   };
@@ -151,7 +141,10 @@ export default function EditProjectModal({ isOpen, onClose, project }: EditProje
                 maxHeight: 600,
                 quality: 0.7,
               });
-              const previewFile = new File(
+
+              const PreviewFileCtor =
+                (globalThis as any).File ?? (window as any).File;
+              const previewFile: File = new PreviewFileCtor(
                 [previewBlob],
                 `preview-${file.name}`,
                 { type: "image/jpeg" },
@@ -352,12 +345,11 @@ export default function EditProjectModal({ isOpen, onClose, project }: EditProje
             </div>
 
             {isSaving && (
-              <div className="space-y-2">
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-muted-foreground">{saveStatus}</span>
-                  <span className="font-medium">{saveProgress}%</span>
-                </div>
-                <Progress value={saveProgress} className="w-full" />
+              <div className="flex items-center justify-center gap-2 py-4">
+                <Loader size="sm" />
+                {saveStatus && (
+                  <span className="text-sm text-muted-foreground">{saveStatus}</span>
+                )}
               </div>
             )}
 

@@ -9,7 +9,7 @@ import { Input } from "~/components/ui/input";
 import { Search, X } from "lucide-react";
 import FilterModal, { type FilterOptions } from "~/components/filter-modal";
 import FavoriteButton from "~/components/favorite-button";
-import { Progress } from "~/components/ui/progress";
+import Loader from "~/components/ui/loader";
 import { useState, useMemo, useEffect } from "react";
 
 interface CategoryPageProps {
@@ -112,33 +112,10 @@ export default function CategoryPage({ params }: CategoryPageProps) {
   };
 
 
-  const [progress, setProgress] = useState(0);
-
-  useEffect(() => {
-    if (!isLoading) return;
-    
-    const interval = setInterval(() => {
-      setProgress((prev) => {
-        if (prev >= 100) {
-          return 0;
-        }
-        return prev + 2;
-      });
-    }, 100);
-
-    return () => clearInterval(interval);
-  }, [isLoading]);
-
   if (isLoading) {
     return (
       <div className="flex h-full w-full items-center justify-center">
-        <div className="w-full max-w-md space-y-2 px-4">
-          <div className="flex items-center justify-between text-sm">
-            <span className="text-muted-foreground">Загрузка...</span>
-            <span className="font-medium">{progress}%</span>
-          </div>
-          <Progress value={progress} className="w-full" />
-        </div>
+        <Loader />
       </div>
     );
   }

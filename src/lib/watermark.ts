@@ -124,9 +124,22 @@ export async function addWatermarkToPresentation(
     pptx.subject = `Презентация с водяным знаком - ${watermarkOptions.text}`;
     pptx.title = `Документ с водяным знаком - ${watermarkOptions.text}`;
     
-    // Генерируем презентацию
-    const renderedBuffer = (await pptx.write("nodebuffer")) as ArrayBuffer;
-    return Buffer.from(renderedBuffer);
+    // Генерируем презентацию как бинарный поток
+    const rendered = await pptx.write({ outputType: "arraybuffer" as any });
+
+    let renderedBuffer: Buffer;
+    if (Buffer.isBuffer(rendered)) {
+      renderedBuffer = rendered;
+    } else if (rendered instanceof Uint8Array) {
+      renderedBuffer = Buffer.from(rendered);
+    } else if (rendered instanceof ArrayBuffer) {
+      renderedBuffer = Buffer.from(new Uint8Array(rendered));
+    } else {
+      // строка или Blob — пытаемся привести к строке и затем к Buffer
+      renderedBuffer = Buffer.from(String(rendered));
+    }
+
+    return renderedBuffer;
   } catch (error) {
     console.error('Ошибка при добавлении водяного знака в презентацию:', error);
     // Если не удалось создать презентацию с водяным знаком, возвращаем оригинальный файл
@@ -156,19 +169,23 @@ export function getFileType(mimeType: string): 'pdf' | 'presentation' | 'other' 
  * Добавляет водяной знак в файл в зависимости от его типа
  */
 export async function addWatermarkToFile(
-  fileBuffer: Buffer,
+  fileBuffer: Buffer | Uint8Array,
   mimeType: string,
-  options: Partial<WatermarkOptions> = {}
+  options: Partial<WatermarkOptions> = {},
 ): Promise<Buffer> {
+  const buffer = Buffer.isBuffer(fileBuffer)
+    ? fileBuffer
+    : Buffer.from(fileBuffer);
+
   const fileType = getFileType(mimeType);
   
   switch (fileType) {
-    case 'pdf':
-      return addWatermarkToPDF(fileBuffer, options);
-    case 'presentation':
-      return addWatermarkToPresentation(fileBuffer, options);
+    case "pdf":
+      return addWatermarkToPDF(buffer, options);
+    case "presentation":
+      return addWatermarkToPresentation(buffer, options);
     default:
       // Для других типов файлов возвращаем оригинальный буфер
-      return fileBuffer;
+      return buffer;
   }
 }

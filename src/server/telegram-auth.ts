@@ -85,18 +85,22 @@ async function isHashValid(data: Record<string, string>, botToken: string) {
   return data.hash === hex;
 }
 
-async function checkOrCreateUser(
-  webAppUser: TelegramWebApps.WebAppUser,
-) {
+async function checkOrCreateUser(webAppUser: TelegramWebApps.WebAppUser) {
+  if (!webAppUser.id) {
+    return null;
+  }
+
+  const telegramId = webAppUser.id.toString();
+
   let user = await db.query.users.findFirst({
-    where: eq(users.telegramId, webAppUser.id.toString()),
+    where: eq(users.telegramId, telegramId),
   });
 
   if (!user) {
     user = await db
       .insert(users)
       .values({
-        telegramId: webAppUser.id.toString(),
+        telegramId,
         name: `${webAppUser.first_name} ${webAppUser.last_name}`.trim(),
         image: webAppUser.photo_url,
       })
