@@ -15,20 +15,34 @@ export async function uploadFile(input: {
       ? window.Telegram?.WebApp?.initData ?? ""
       : "";
 
-  const response = await fetch("/api/upload", {
-    method: "POST",
-    headers: {
-      "x-telegram-init-data": initData,
-    },
-    body: formData,
-  });
+  try {
+    const response = await fetch("/api/upload", {
+      method: "POST",
+      headers: {
+        "x-telegram-init-data": initData,
+      },
+      body: formData,
+    });
 
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(errorText || "Upload failed");
+    if (!response.ok) {
+      let errorText = "Upload failed";
+      try {
+        const errorJson = await response.json();
+        errorText = errorJson.error || errorText;
+      } catch {
+        errorText = await response.text() || errorText;
+      }
+      
+      throw new Error(`${response.status}: ${errorText}`);
+    }
+
+    return response.json();
+  } catch (error) {
+    if (error instanceof Error) {
+      throw error;
+    }
+    throw new Error("Network error during upload");
   }
-
-  return response.json();
 }
 
 export async function createImagePreview(

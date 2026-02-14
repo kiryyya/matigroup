@@ -129,49 +129,71 @@ export default function EditProjectModal({ isOpen, onClose, project }: EditProje
         const fileArray = Array.from(files);
         const processFiles = async () => {
           startUpload();
+          
+          const errors: Array<{ fileName: string; error: string }> = [];
+          let successCount = 0;
+          
           try {
             for (const file of fileArray) {
-              if (file.size > 5 * 1024 * 1024) {
-                alert(`Файл ${file.name} слишком большой. Максимальный размер: 5MB`);
-                continue;
+              try {
+                if (file.size > 5 * 1024 * 1024) {
+                  errors.push({ fileName: file.name, error: "Файл слишком большой. Максимальный размер: 5MB" });
+                  continue;
+                }
+                
+                const { width, height } = await getImageDimensions(file);
+                const previewBlob = await createImagePreview(file, {
+                  maxWidth: 600,
+                  maxHeight: 600,
+                  quality: 0.7,
+                });
+
+                const PreviewFileCtor =
+                  (globalThis as any).File ?? (window as any).File;
+                const previewFile: File = new PreviewFileCtor(
+                  [previewBlob],
+                  `preview-${file.name}`,
+                  { type: "image/jpeg" },
+                );
+
+                const [originalUpload, previewUpload] = await Promise.all([
+                  uploadFile({ file, kind: "image", variant: "original" }),
+                  uploadFile({ file: previewFile, kind: "image", variant: "preview" }),
+                ]);
+
+                setImages((prev) => [
+                  ...prev,
+                  {
+                    key: originalUpload.key,
+                    url: originalUpload.url,
+                    previewUrl: previewUpload.url,
+                    size: originalUpload.size,
+                    mimeType: originalUpload.mimeType,
+                    width,
+                    height,
+                    originalName: originalUpload.originalName,
+                  },
+                ]);
+                
+                successCount++;
+              } catch (error) {
+                const errorMessage = error instanceof Error ? error.message : "Неизвестная ошибка";
+                errors.push({ fileName: file.name, error: errorMessage });
+                console.error(`Ошибка загрузки изображения ${file.name}:`, error);
               }
-              const { width, height } = await getImageDimensions(file);
-              const previewBlob = await createImagePreview(file, {
-                maxWidth: 600,
-                maxHeight: 600,
-                quality: 0.7,
-              });
-
-              const PreviewFileCtor =
-                (globalThis as any).File ?? (window as any).File;
-              const previewFile: File = new PreviewFileCtor(
-                [previewBlob],
-                `preview-${file.name}`,
-                { type: "image/jpeg" },
-              );
-
-              const [originalUpload, previewUpload] = await Promise.all([
-                uploadFile({ file, kind: "image", variant: "original" }),
-                uploadFile({ file: previewFile, kind: "image", variant: "preview" }),
-              ]);
-
-              setImages((prev) => [
-                ...prev,
-                {
-                  key: originalUpload.key,
-                  url: originalUpload.url,
-                  previewUrl: previewUpload.url,
-                  size: originalUpload.size,
-                  mimeType: originalUpload.mimeType,
-                  width,
-                  height,
-                  originalName: originalUpload.originalName,
-                },
-              ]);
+            }
+            
+            // Показываем результаты
+            if (errors.length > 0) {
+              const errorDetails = errors.map(e => `• ${e.fileName}: ${e.error}`).join('\n');
+              alert(`Не удалось загрузить ${errors.length} из ${fileArray.length} файлов:\n\n${errorDetails}`);
+            } else if (successCount > 0) {
+              // Все успешно загружены
+              console.log(`Успешно загружено ${successCount} изображений`);
             }
           } catch (error) {
-            console.error("Ошибка загрузки изображения:", error);
-            alert("Не удалось загрузить изображение");
+            console.error("Критическая ошибка при обработке файлов:", error);
+            alert("Произошла критическая ошибка при загрузке изображений");
           } finally {
             endUpload();
           }
