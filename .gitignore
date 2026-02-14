@@ -3,7 +3,6 @@
 # dependencies
 /node_modules
 /.pnp
-/gz
 .pnp.js
 
 # testing
@@ -25,6 +24,17 @@ next-env.d.ts
 # misc
 .DS_Store
 *.pem
+
+# archives
+*.zip
+*.tar
+*.tar.gz
+*.tgz
+*.rar
+*.7z
+*.gz
+*.bz2
+*.xz
 
 # debug
 npm-debug.log*

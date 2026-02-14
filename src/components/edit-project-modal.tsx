@@ -88,7 +88,7 @@ export default function EditProjectModal({ isOpen, onClose, project }: EditProje
     if (!project) return;
 
     setIsSaving(true);
-    setSaveStatus("Сохранение изменений...");
+      setSaveStatus("Сохранение изменений...");
 
     try {
       await updateProject.mutateAsync({
