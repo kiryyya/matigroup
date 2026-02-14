@@ -141,25 +141,31 @@ export default function EditProjectModal({ isOpen, onClose, project }: EditProje
                   continue;
                 }
                 
-                const { width, height } = await getImageDimensions(file);
-                const previewBlob = await createImagePreview(file, {
-                  maxWidth: 600,
-                  maxHeight: 600,
-                  quality: 0.7,
-                });
+              const { width, height } = await getImageDimensions(file);
+              const previewBlob = await createImagePreview(file, {
+                maxWidth: 600,
+                maxHeight: 600,
+                quality: 0.7,
+              });
 
-                const PreviewFileCtor =
-                  (globalThis as any).File ?? (window as any).File;
-                const previewFile: File = new PreviewFileCtor(
-                  [previewBlob],
-                  `preview-${file.name}`,
-                  { type: "image/jpeg" },
-                );
+              const PreviewFileCtor =
+                (globalThis as any).File ?? (window as any).File;
+              const previewFile: File = new PreviewFileCtor(
+                [previewBlob],
+                `preview-${file.name}`,
+                { type: "image/jpeg" },
+              );
 
-                const [originalUpload, previewUpload] = await Promise.all([
-                  uploadFile({ file, kind: "image", variant: "original" }),
-                  uploadFile({ file: previewFile, kind: "image", variant: "preview" }),
-                ]);
+              // Проверяем размер preview файла
+              if (previewFile.size > 5 * 1024 * 1024) {
+                errors.push({ fileName: file.name, error: "Preview файл слишком большой после обработки" });
+                continue;
+              }
+
+              const [originalUpload, previewUpload] = await Promise.all([
+                uploadFile({ file, kind: "image", variant: "original" }),
+                uploadFile({ file: previewFile, kind: "image", variant: "preview" }),
+              ]);
 
                 setImages((prev) => [
                   ...prev,

@@ -27,13 +27,18 @@ export async function uploadFile(input: {
     if (!response.ok) {
       let errorText = "Upload failed";
       try {
-        const errorJson = await response.json();
-        errorText = errorJson.error || errorText;
+        const text = await response.text();
+        try {
+          const errorJson = JSON.parse(text);
+          errorText = errorJson.error || errorText;
+        } catch {
+          errorText = text || errorText;
+        }
       } catch {
-        errorText = await response.text() || errorText;
+        errorText = `HTTP ${response.status}: ${response.statusText}`;
       }
       
-      throw new Error(`${response.status}: ${errorText}`);
+      throw new Error(errorText);
     }
 
     return response.json();

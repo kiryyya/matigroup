@@ -159,6 +159,12 @@ export default function CreateProjectModal({ isOpen, onClose }: CreateProjectMod
                   { type: "image/jpeg" },
                 );
 
+                // Проверяем размер preview файла
+                if (previewFile.size > 5 * 1024 * 1024) {
+                  errors.push({ fileName: file.name, error: "Preview файл слишком большой после обработки" });
+                  continue;
+                }
+
                 const [originalUpload, previewUpload] = await Promise.all([
                   uploadFile({ file, kind: "image", variant: "original" }),
                   uploadFile({ file: previewFile, kind: "image", variant: "preview" }),
