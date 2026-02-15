@@ -88,10 +88,10 @@ export default function ProjectPage({ params }: ProjectPageProps) {
   // Используем полные данные для админов, оптимизированные для остальных
   const displayProject = user?.role === "admin" ? (projectFull || project) : project;
 
-  // Сброс индекса при изменении проекта
+  // Сброс индекса при изменении проекта или params.id
   useEffect(() => {
     setCurrentImageIndex(0);
-  }, [displayProject?.id]);
+  }, [params.id, displayProject?.id]);
 
   const handleDeleteProject = async () => {
     if (!displayProject) return;
@@ -311,17 +311,25 @@ export default function ProjectPage({ params }: ProjectPageProps) {
         {/* Левая колонка - Изображения с каруселью (50%) */}
         <div className="w-full md:w-1/2 flex-shrink-0">
           {displayProject.images && displayProject.images.length > 0 ? (
-            <div className="relative w-full h-full min-h-[400px] bg-muted rounded-lg overflow-hidden">
+            <div className="relative w-full aspect-square md:aspect-auto md:h-full md:min-h-[400px] bg-muted rounded-lg overflow-hidden">
               {/* Основное изображение */}
               <img
+                key={`${displayProject.id}-${currentImageIndex}`}
                 src={(displayProject.images[currentImageIndex] as StoredImage).url}
                 alt={`${displayProject.title} - изображение ${currentImageIndex + 1}`}
                 className="w-full h-full object-cover"
-                loading="lazy"
+                loading="eager"
                 decoding="async"
+                onLoad={(e) => {
+                  // Предотвращаем layout shift после загрузки
+                  const target = e.target as HTMLImageElement;
+                  target.style.opacity = '1';
+                }}
+                style={{ opacity: 0, transition: 'opacity 0.2s' }}
                 onError={(e) => {
                   const target = e.target as HTMLImageElement;
                   target.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAwIiBoZWlnaHQ9IjMwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjZjNmNGY2Ii8+PHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtZmFtaWx5PSJBcmlhbCIgZm9udC1zaXplPSIxNCIgZmlsbD0iIzY2NjY2NiIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZHk9Ii4zZW0iPkltYWdlPC90ZXh0Pjwvc3ZnPg==';
+                  target.style.opacity = '1';
                 }}
               />
               
@@ -369,7 +377,7 @@ export default function ProjectPage({ params }: ProjectPageProps) {
               )}
             </div>
           ) : (
-            <div className="w-full h-full min-h-[400px] bg-muted rounded-lg flex items-center justify-center">
+            <div className="w-full aspect-square md:aspect-auto md:h-full md:min-h-[400px] bg-muted rounded-lg flex items-center justify-center">
               <div className="text-center text-muted-foreground">
                 <ImageIcon className="h-16 w-16 mx-auto mb-2 opacity-50" />
                 <p>Нет изображений</p>
