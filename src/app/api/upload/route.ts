@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireTelegramAdmin } from "~/server/telegram-auth";
-import { uploadPrivateObject, uploadPublicObject } from "~/lib/storage";
+import { uploadPrivateObject, uploadPublicObject, getPublicObject } from "~/lib/storage";
 import { addWatermarkToImage } from "~/lib/watermark";
 import { db } from "~/server/db";
 import { settings } from "~/server/db/schema";
@@ -58,11 +58,29 @@ export async function POST(request: NextRequest) {
             color?: { r: number; g: number; b: number };
             angle?: number;
             position?: string;
+            useImage?: boolean;
+            watermarkImageKey?: string;
           };
 
           // Применяем водяной знак, если он включен
           if (watermarkConfig.enabled !== false) {
             const imageBuffer = Buffer.from(body);
+            
+            // Если используется изображение, загружаем его из storage
+            let watermarkImageBuffer: Buffer | undefined;
+            if (watermarkConfig.useImage && watermarkConfig.watermarkImageKey) {
+              try {
+                const watermarkObject = await getPublicObject({ key: watermarkConfig.watermarkImageKey });
+                if (watermarkObject.Body) {
+                  const watermarkArrayBuffer = await watermarkObject.Body.transformToByteArray();
+                  watermarkImageBuffer = Buffer.from(watermarkArrayBuffer);
+                }
+              } catch (error) {
+                console.error("Ошибка загрузки изображения водяного знака:", error);
+                // Продолжаем с текстовым водяным знаком
+              }
+            }
+            
             const watermarkedBuffer = await addWatermarkToImage(imageBuffer, {
               enabled: watermarkConfig.enabled ?? true,
               text: watermarkConfig.text ?? 'Matigroup',
@@ -71,6 +89,7 @@ export async function POST(request: NextRequest) {
               color: watermarkConfig.color ?? { r: 0, g: 0, b: 0 },
               angle: watermarkConfig.angle ?? -45,
               position: (watermarkConfig.position as any) ?? 'center',
+              imageWatermark: watermarkImageBuffer,
             });
             body = new Uint8Array(watermarkedBuffer);
           }

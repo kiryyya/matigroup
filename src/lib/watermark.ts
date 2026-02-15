@@ -177,10 +177,16 @@ export async function addWatermarkToImage(
       return addImageWatermark(imageBuffer, watermarkOptions.imageWatermark, {
         opacity: watermarkOptions.opacity || 0.3,
         position: watermarkOptions.position || 'center',
+        angle: watermarkOptions.angle || 0,
       });
     }
     
-    // Создаем SVG с текстовым водяным знаком
+    // Создаем SVG с текстовым водяным знаком (только если есть текст)
+    if (!watermarkOptions.text) {
+      // Если нет текста и нет изображения, возвращаем оригинал
+      return imageBuffer;
+    }
+    
     const fontSize = watermarkOptions.fontSize || Math.min(width, height) / 10;
     const svgText = createWatermarkSVG(
       watermarkOptions.text,
@@ -339,7 +345,7 @@ function escapeXml(text: string): string {
 async function addImageWatermark(
   imageBuffer: Buffer,
   watermarkImage: Buffer,
-  options: { opacity: number; position: string }
+  options: { opacity: number; position: string; angle?: number }
 ): Promise<Buffer> {
   const image = sharp(imageBuffer);
   const watermark = sharp(watermarkImage);
@@ -362,19 +368,31 @@ async function addImageWatermark(
   const scaledWidth = Math.round(watermarkWidth * scale);
   const scaledHeight = Math.round(watermarkHeight * scale);
   
-  // Применяем прозрачность
-  const watermarkWithOpacity = await watermark
-    .resize(scaledWidth, scaledHeight)
+  // Применяем поворот и прозрачность
+  let processedWatermark = watermark.resize(scaledWidth, scaledHeight);
+  
+  // Поворачиваем, если нужно
+  if (options.angle && options.angle !== 0) {
+    processedWatermark = processedWatermark.rotate(options.angle);
+  }
+  
+  // Применяем прозрачность через composite с полупрозрачным слоем
+  const watermarkProcessed = await processedWatermark
+    .ensureAlpha()
+    .toBuffer();
+  
+  // Создаем маску прозрачности через SVG
+  const opacityMask = Buffer.from(
+    `<svg width="${scaledWidth}" height="${scaledHeight}">
+      <rect width="100%" height="100%" fill="white" opacity="${options.opacity}"/>
+    </svg>`
+  );
+  
+  // Применяем прозрачность через composite
+  const watermarkWithOpacity = await sharp(watermarkProcessed)
     .composite([
       {
-        input: {
-          create: {
-            width: scaledWidth,
-            height: scaledHeight,
-            channels: 4,
-            background: { r: 0, g: 0, b: 0, alpha: 0 },
-          },
-        },
+        input: opacityMask,
         blend: 'dest-in',
       },
     ])

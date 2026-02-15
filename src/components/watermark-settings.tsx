@@ -8,7 +8,8 @@ import { Label } from "~/components/ui/label";
 import { Switch } from "~/components/ui/switch";
 import { useState, useEffect } from "react";
 import { toast } from "sonner";
-import { Save, RotateCcw } from "lucide-react";
+import { Save, RotateCcw, Upload, X, Image as ImageIcon } from "lucide-react";
+import { uploadFile } from "~/lib/upload";
 
 export default function WatermarkSettings() {
   const { data: settings, isLoading } = api.settings.getWatermarkSettings.useQuery();
@@ -23,6 +24,16 @@ export default function WatermarkSettings() {
     },
   });
 
+  const uploadWatermarkImage = api.settings.uploadWatermarkImage.useMutation({
+    onSuccess: () => {
+      toast.success("Изображение водяного знака загружено");
+      void utils.settings.getWatermarkSettings.invalidate();
+    },
+    onError: (error) => {
+      toast.error(`Ошибка при загрузке изображения: ${error.message}`);
+    },
+  });
+
   const [formData, setFormData] = useState<{
     enabled: boolean;
     text: string;
@@ -31,6 +42,8 @@ export default function WatermarkSettings() {
     color: { r: number; g: number; b: number };
     angle: number;
     position: 'center' | 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right' | 'repeat';
+    useImage: boolean;
+    watermarkImageKey?: string;
   }>({
     enabled: true,
     text: 'Matigroup',
@@ -39,7 +52,10 @@ export default function WatermarkSettings() {
     color: { r: 0, g: 0, b: 0 },
     angle: -45,
     position: 'center',
+    useImage: false,
   });
+
+  const [watermarkImagePreview, setWatermarkImagePreview] = useState<string | null>(null);
 
   useEffect(() => {
     if (settings) {
@@ -51,7 +67,17 @@ export default function WatermarkSettings() {
         color: settings.color ?? { r: 0, g: 0, b: 0 },
         angle: settings.angle ?? -45,
         position: (settings.position as 'center' | 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right' | 'repeat') ?? 'center',
+        useImage: settings.useImage ?? false,
+        watermarkImageKey: settings.watermarkImageKey,
       });
+      
+      // Загружаем превью изображения водяного знака, если оно есть
+      if (settings.watermarkImageKey) {
+        const baseUrl = process.env.NEXT_PUBLIC_APP_URL || window.location.origin;
+        setWatermarkImagePreview(`${baseUrl}/api/images/${settings.watermarkImageKey}`);
+      } else {
+        setWatermarkImagePreview(null);
+      }
     }
   }, [settings]);
 
@@ -70,8 +96,51 @@ export default function WatermarkSettings() {
         color: settings.color ?? { r: 0, g: 0, b: 0 },
         angle: settings.angle ?? -45,
         position: settings.position ?? 'center',
+        useImage: settings.useImage ?? false,
+        watermarkImageKey: settings.watermarkImageKey,
       });
     }
+  };
+
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Проверяем, что это изображение
+    if (!file.type.startsWith('image/')) {
+      toast.error('Пожалуйста, выберите изображение');
+      return;
+    }
+
+    try {
+      // Загружаем изображение
+      const result = await uploadFile({
+        file,
+        kind: 'image',
+        variant: 'original',
+      });
+
+      // Сохраняем ключ изображения в настройках
+      uploadWatermarkImage.mutate({ imageKey: result.key });
+      
+      // Показываем превью
+      const baseUrl = process.env.NEXT_PUBLIC_APP_URL || window.location.origin;
+      setWatermarkImagePreview(`${baseUrl}/api/images/${result.key}`);
+    } catch (error) {
+      console.error('Ошибка загрузки изображения:', error);
+      toast.error('Не удалось загрузить изображение');
+    }
+  };
+
+  const handleRemoveImage = () => {
+    setFormData({ ...formData, useImage: false, watermarkImageKey: undefined });
+    setWatermarkImagePreview(null);
+    // Обновляем настройки, чтобы убрать изображение
+    updateSettings.mutate({
+      ...formData,
+      useImage: false,
+      watermarkImageKey: undefined,
+    });
   };
 
   if (isLoading) {
@@ -114,22 +183,97 @@ export default function WatermarkSettings() {
 
           {formData.enabled && (
             <>
-              {/* Текст водяного знака */}
+              {/* Выбор типа водяного знака */}
               <div className="space-y-2">
-                <Label htmlFor="text">Текст водяного знака</Label>
-                <Input
-                  id="text"
-                  value={formData.text}
-                  onChange={(e) =>
-                    setFormData({ ...formData, text: e.target.value })
-                  }
-                  placeholder="Matigroup"
-                  maxLength={100}
-                />
-                <p className="text-sm text-muted-foreground">
-                  Максимум 100 символов
-                </p>
+                <Label>Тип водяного знака</Label>
+                <div className="flex gap-4">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="watermarkType"
+                      checked={!formData.useImage}
+                      onChange={() => setFormData({ ...formData, useImage: false })}
+                      className="w-4 h-4"
+                    />
+                    <span>Текст</span>
+                  </label>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="watermarkType"
+                      checked={formData.useImage}
+                      onChange={() => setFormData({ ...formData, useImage: true })}
+                      className="w-4 h-4"
+                    />
+                    <span>Изображение</span>
+                  </label>
+                </div>
               </div>
+
+              {formData.useImage ? (
+                /* Загрузка изображения водяного знака */
+                <div className="space-y-2">
+                  <Label>Изображение водяного знака</Label>
+                  {watermarkImagePreview ? (
+                    <div className="relative">
+                      <img
+                        src={watermarkImagePreview}
+                        alt="Водяной знак"
+                        className="w-full max-w-xs h-auto rounded-lg border"
+                      />
+                      <Button
+                        type="button"
+                        variant="destructive"
+                        size="sm"
+                        onClick={handleRemoveImage}
+                        className="absolute top-2 right-2"
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="border-2 border-dashed rounded-lg p-6 text-center">
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={handleImageUpload}
+                        className="hidden"
+                        id="watermark-image-upload"
+                        disabled={uploadWatermarkImage.isPending}
+                      />
+                      <label
+                        htmlFor="watermark-image-upload"
+                        className="cursor-pointer flex flex-col items-center gap-2"
+                      >
+                        <Upload className="h-8 w-8 text-muted-foreground" />
+                        <span className="text-sm text-muted-foreground">
+                          {uploadWatermarkImage.isPending ? 'Загрузка...' : 'Нажмите для загрузки изображения'}
+                        </span>
+                      </label>
+                    </div>
+                  )}
+                  <p className="text-sm text-muted-foreground">
+                    Загрузите изображение для использования в качестве водяного знака. При замене старое изображение будет перезаписано.
+                  </p>
+                </div>
+              ) : (
+                /* Текст водяного знака */
+                <div className="space-y-2">
+                  <Label htmlFor="text">Текст водяного знака</Label>
+                  <Input
+                    id="text"
+                    value={formData.text}
+                    onChange={(e) =>
+                      setFormData({ ...formData, text: e.target.value })
+                    }
+                    placeholder="Matigroup"
+                    maxLength={100}
+                  />
+                  <p className="text-sm text-muted-foreground">
+                    Максимум 100 символов
+                  </p>
+                </div>
+              )}
 
               {/* Прозрачность */}
               <div className="space-y-2">
