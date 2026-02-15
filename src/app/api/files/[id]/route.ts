@@ -100,6 +100,21 @@ export async function GET(
     const fileName = attachment.originalName || `attachment_${attachmentIdx}`;
     const mimeType = attachment.mimeType || "application/octet-stream";
 
+    // Функция для безопасного кодирования имени файла для HTTP заголовков
+    const encodeFileName = (name: string): string => {
+      // Проверяем, содержит ли имя файла не-ASCII символы
+      const hasNonAscii = /[^\x00-\x7F]/.test(name);
+      
+      if (hasNonAscii) {
+        // Используем RFC 5987 encoding для не-ASCII символов
+        const encoded = encodeURIComponent(name);
+        return `filename*=UTF-8''${encoded}`;
+      }
+      
+      // Для ASCII символов используем обычный формат
+      return `filename="${name.replace(/"/g, '\\"')}"`;
+    };
+
     try {
       const s3Object = await getPrivateObject({ key: fileKey });
       if (!s3Object.Body) {
@@ -129,7 +144,7 @@ export async function GET(
         status: 200,
         headers: {
           "Content-Type": mimeType,
-          "Content-Disposition": `attachment; filename="${fileName}"`,
+          "Content-Disposition": `attachment; ${encodeFileName(fileName)}`,
           "Content-Length": finalBuffer.length.toString(),
         },
       });
