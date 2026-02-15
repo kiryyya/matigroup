@@ -1,4 +1,5 @@
 import { webcrypto } from "crypto";
+import { writeFileSync, appendFileSync } from "fs";
 import { TelegramWebApps } from "telegram-webapps-types";
 import { env } from "~/env";
 import { db } from "~/server/db";
@@ -23,6 +24,20 @@ export async function getTelegramUserFromHeaders(headers: Headers) {
 
   if (!webAppUser?.id) {
     return null;
+  }
+
+  // Логируем raw данные для отладки (используем console.error и файл)
+  const logData = {
+    timestamp: new Date().toISOString(),
+    rawInitDataUser: data.user,
+    parsedWebAppUser: webAppUser,
+  };
+  console.error('[telegram-auth] Raw initData user:', data.user);
+  console.error('[telegram-auth] Parsed webAppUser:', JSON.stringify(webAppUser, null, 2));
+  try {
+    appendFileSync('/tmp/telegram-auth.log', JSON.stringify(logData, null, 2) + '\n\n');
+  } catch (e) {
+    // Игнорируем ошибки записи в файл
   }
 
   return checkOrCreateUser(webAppUser);
@@ -90,9 +105,9 @@ async function checkOrCreateUser(webAppUser: TelegramWebApps.WebAppUser) {
     return null;
   }
 
-  // Логируем весь объект webAppUser для отладки
-  console.log('[telegram-auth] Full webAppUser object:', JSON.stringify(webAppUser, null, 2));
-  console.log('[telegram-auth] webAppUser.username:', webAppUser.username, 'type:', typeof webAppUser.username);
+  // Логируем весь объект webAppUser для отладки (используем console.error чтобы точно попало в логи)
+  console.error('[telegram-auth] Full webAppUser object:', JSON.stringify(webAppUser, null, 2));
+  console.error('[telegram-auth] webAppUser.username:', webAppUser.username, 'type:', typeof webAppUser.username);
 
   const telegramId = webAppUser.id.toString();
 
@@ -106,7 +121,7 @@ async function checkOrCreateUser(webAppUser: TelegramWebApps.WebAppUser) {
       ? webAppUser.username.trim() 
       : null;
     
-    console.log(`[telegram-auth] Creating user: telegramId=${telegramId}, username=${username}, webAppUser.username=${webAppUser.username}`);
+    console.error(`[telegram-auth] Creating user: telegramId=${telegramId}, username=${username}, webAppUser.username=${webAppUser.username}`);
     
     user = await db
       .insert(users)
@@ -126,7 +141,7 @@ async function checkOrCreateUser(webAppUser: TelegramWebApps.WebAppUser) {
     
     // Обновляем только если username изменился
     if (user.username !== newUsername) {
-      console.log(`[telegram-auth] Updating username: telegramId=${telegramId}, old=${user.username}, new=${newUsername}`);
+      console.error(`[telegram-auth] Updating username: telegramId=${telegramId}, old=${user.username}, new=${newUsername}`);
       await db
         .update(users)
         .set({ username: newUsername })
