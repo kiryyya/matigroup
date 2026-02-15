@@ -1,5 +1,6 @@
 import { PDFDocument, rgb, StandardFonts } from 'pdf-lib';
 import PptxGenJS from 'pptxgenjs';
+import sharp from 'sharp';
 
 export interface WatermarkOptions {
   text: string;
@@ -7,6 +8,10 @@ export interface WatermarkOptions {
   fontSize?: number;
   color?: { r: number; g: number; b: number };
   angle?: number;
+  // Новые опции для изображений
+  position?: 'center' | 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right' | 'repeat';
+  imageWatermark?: Buffer; // Изображение-водяной знак (логотип)
+  enabled?: boolean; // Включен ли водяной знак
 }
 
 const DEFAULT_WATERMARK_OPTIONS: WatermarkOptions = {
@@ -148,9 +153,276 @@ export async function addWatermarkToPresentation(
 }
 
 /**
+ * Добавляет водяной знак на изображение используя Sharp
+ */
+export async function addWatermarkToImage(
+  imageBuffer: Buffer,
+  options: Partial<WatermarkOptions> = {}
+): Promise<Buffer> {
+  const watermarkOptions = { ...DEFAULT_WATERMARK_OPTIONS, ...options };
+  
+  // Если водяной знак отключен, возвращаем оригинал
+  if (watermarkOptions.enabled === false) {
+    return imageBuffer;
+  }
+  
+  try {
+    // Получаем размеры исходного изображения
+    const metadata = await sharp(imageBuffer).metadata();
+    const width = metadata.width || 0;
+    const height = metadata.height || 0;
+    
+    // Если есть изображение-водяной знак, используем его
+    if (watermarkOptions.imageWatermark) {
+      return addImageWatermark(imageBuffer, watermarkOptions.imageWatermark, {
+        opacity: watermarkOptions.opacity || 0.3,
+        position: watermarkOptions.position || 'center',
+      });
+    }
+    
+    // Создаем SVG с текстовым водяным знаком
+    const fontSize = watermarkOptions.fontSize || Math.min(width, height) / 10;
+    const svgText = createWatermarkSVG(
+      watermarkOptions.text,
+      fontSize,
+      watermarkOptions.color || { r: 0, g: 0, b: 0 },
+      watermarkOptions.opacity || 0.1,
+      watermarkOptions.angle || -45,
+      width,
+      height,
+      watermarkOptions.position || 'center'
+    );
+    
+    // Накладываем SVG на изображение
+    const watermarked = await sharp(imageBuffer)
+      .composite([
+        {
+          input: Buffer.from(svgText),
+          blend: 'over',
+        },
+      ])
+      .toBuffer();
+    
+    return watermarked;
+  } catch (error) {
+    console.error('Ошибка при добавлении водяного знака на изображение:', error);
+    // В случае ошибки возвращаем оригинальное изображение
+    return imageBuffer;
+  }
+}
+
+/**
+ * Создает SVG с текстовым водяным знаком
+ */
+function createWatermarkSVG(
+  text: string,
+  fontSize: number,
+  color: { r: number; g: number; b: number },
+  opacity: number,
+  angle: number,
+  width: number,
+  height: number,
+  position: string
+): string {
+  const rgbColor = `rgb(${color.r}, ${color.g}, ${color.b})`;
+  
+  // Вычисляем позицию в зависимости от параметра
+  let x = width / 2;
+  let y = height / 2;
+  let textAnchor = 'middle';
+  
+  switch (position) {
+    case 'top-left':
+      x = width * 0.1;
+      y = height * 0.1;
+      textAnchor = 'start';
+      break;
+    case 'top-right':
+      x = width * 0.9;
+      y = height * 0.1;
+      textAnchor = 'end';
+      break;
+    case 'bottom-left':
+      x = width * 0.1;
+      y = height * 0.9;
+      textAnchor = 'start';
+      break;
+    case 'bottom-right':
+      x = width * 0.9;
+      y = height * 0.9;
+      textAnchor = 'end';
+      break;
+    case 'repeat':
+      // Для repeat создаем паттерн
+      return createRepeatingWatermarkSVG(text, fontSize, rgbColor, opacity, angle, width, height);
+    default: // center
+      x = width / 2;
+      y = height / 2;
+      textAnchor = 'middle';
+  }
+  
+  return `
+    <svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">
+      <g transform="translate(${x}, ${y}) rotate(${angle})">
+        <text
+          x="0"
+          y="0"
+          font-family="Arial, sans-serif"
+          font-size="${fontSize}"
+          fill="${rgbColor}"
+          opacity="${opacity}"
+          text-anchor="${textAnchor}"
+          dominant-baseline="middle"
+          font-weight="bold"
+        >${escapeXml(text)}</text>
+      </g>
+    </svg>
+  `;
+}
+
+/**
+ * Создает повторяющийся водяной знак (паттерн)
+ */
+function createRepeatingWatermarkSVG(
+  text: string,
+  fontSize: number,
+  color: string,
+  opacity: number,
+  angle: number,
+  width: number,
+  height: number
+): string {
+  const spacing = fontSize * 3; // Расстояние между водяными знаками
+  
+  const texts = [];
+  for (let y = 0; y < height + spacing; y += spacing) {
+    for (let x = 0; x < width + spacing; x += spacing) {
+      texts.push(
+        `<text
+          x="${x}"
+          y="${y}"
+          font-family="Arial, sans-serif"
+          font-size="${fontSize}"
+          fill="${color}"
+          opacity="${opacity}"
+          text-anchor="middle"
+          dominant-baseline="middle"
+          transform="rotate(${angle} ${x} ${y})"
+          font-weight="bold"
+        >${escapeXml(text)}</text>`
+      );
+    }
+  }
+  
+  return `
+    <svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">
+      ${texts.join('\n')}
+    </svg>
+  `;
+}
+
+/**
+ * Экранирует XML символы
+ */
+function escapeXml(text: string): string {
+  return text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&apos;');
+}
+
+/**
+ * Добавляет изображение-водяной знак (например, логотип)
+ */
+async function addImageWatermark(
+  imageBuffer: Buffer,
+  watermarkImage: Buffer,
+  options: { opacity: number; position: string }
+): Promise<Buffer> {
+  const image = sharp(imageBuffer);
+  const watermark = sharp(watermarkImage);
+  
+  const imageMetadata = await image.metadata();
+  const watermarkMetadata = await watermark.metadata();
+  
+  const imageWidth = imageMetadata.width || 0;
+  const imageHeight = imageMetadata.height || 0;
+  const watermarkWidth = watermarkMetadata.width || 0;
+  const watermarkHeight = watermarkMetadata.height || 0;
+  
+  // Масштабируем водяной знак (например, 20% от размера изображения)
+  const maxWatermarkSize = Math.min(imageWidth, imageHeight) * 0.2;
+  const scale = Math.min(
+    maxWatermarkSize / watermarkWidth,
+    maxWatermarkSize / watermarkHeight
+  );
+  
+  const scaledWidth = Math.round(watermarkWidth * scale);
+  const scaledHeight = Math.round(watermarkHeight * scale);
+  
+  // Применяем прозрачность
+  const watermarkWithOpacity = await watermark
+    .resize(scaledWidth, scaledHeight)
+    .composite([
+      {
+        input: {
+          create: {
+            width: scaledWidth,
+            height: scaledHeight,
+            channels: 4,
+            background: { r: 0, g: 0, b: 0, alpha: 0 },
+          },
+        },
+        blend: 'dest-in',
+      },
+    ])
+    .toBuffer();
+  
+  // Вычисляем позицию
+  let left = 0;
+  let top = 0;
+  
+  switch (options.position) {
+    case 'top-left':
+      left = Math.round(imageWidth * 0.05);
+      top = Math.round(imageHeight * 0.05);
+      break;
+    case 'top-right':
+      left = Math.round(imageWidth - scaledWidth - imageWidth * 0.05);
+      top = Math.round(imageHeight * 0.05);
+      break;
+    case 'bottom-left':
+      left = Math.round(imageWidth * 0.05);
+      top = Math.round(imageHeight - scaledHeight - imageHeight * 0.05);
+      break;
+    case 'bottom-right':
+      left = Math.round(imageWidth - scaledWidth - imageWidth * 0.05);
+      top = Math.round(imageHeight - scaledHeight - imageHeight * 0.05);
+      break;
+    default: // center
+      left = Math.round((imageWidth - scaledWidth) / 2);
+      top = Math.round((imageHeight - scaledHeight) / 2);
+  }
+  
+  // Накладываем водяной знак
+  return image
+    .composite([
+      {
+        input: watermarkWithOpacity,
+        left,
+        top,
+        blend: 'over',
+      },
+    ])
+    .toBuffer();
+}
+
+/**
  * Определяет тип файла по MIME типу
  */
-export function getFileType(mimeType: string): 'pdf' | 'presentation' | 'other' {
+export function getFileType(mimeType: string): 'pdf' | 'presentation' | 'image' | 'other' {
   if (mimeType.includes('pdf')) {
     return 'pdf';
   }
@@ -160,6 +432,10 @@ export function getFileType(mimeType: string): 'pdf' | 'presentation' | 'other' 
       mimeType.includes('pptx') || 
       mimeType.includes('ppt')) {
     return 'presentation';
+  }
+  
+  if (mimeType.startsWith('image/')) {
+    return 'image';
   }
   
   return 'other';
@@ -177,9 +453,16 @@ export async function addWatermarkToFile(
     ? fileBuffer
     : Buffer.from(fileBuffer);
 
+  // Если водяной знак отключен, возвращаем оригинал
+  if (options.enabled === false) {
+    return buffer;
+  }
+
   const fileType = getFileType(mimeType);
   
   switch (fileType) {
+    case "image":
+      return addWatermarkToImage(buffer, options);
     case "pdf":
       return addWatermarkToPDF(buffer, options);
     case "presentation":

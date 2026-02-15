@@ -8,6 +8,7 @@ import Loader from "~/components/ui/loader";
 import { Plus, Search } from "lucide-react";
 import CreateProjectModal from "~/components/create-project-modal";
 import UserSearchModal from "~/components/user-search-modal";
+import WatermarkSettings from "~/components/watermark-settings";
 import { useModal } from "~/contexts/modal-context";
 import { useState, useEffect } from "react";
 
@@ -68,6 +69,9 @@ export default function Settings() {
           </Button>
         </CardContent>
       </Card>
+
+      {/* Настройки водяного знака */}
+      {user?.role === "admin" && <WatermarkSettings />}
 
       {/* Модальное окно создания проекта */}
       <CreateProjectModal 

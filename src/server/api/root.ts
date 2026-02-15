@@ -2,6 +2,7 @@ import { tgRouter } from "~/server/api/routers/tg";
 import { createCallerFactory, createTRPCRouter } from "~/server/api/trpc";
 import { shopRouter } from "./routers/shop";
 import { projectsRouter } from "./routers/projects";
+import { settingsRouter } from "./routers/settings";
 // tapRouter removed
 
 /**
@@ -13,6 +14,7 @@ export const appRouter = createTRPCRouter({
   tg: tgRouter,
   shop: shopRouter,
   projects: projectsRouter,
+  settings: settingsRouter,
 });
 
 // export type definition of API

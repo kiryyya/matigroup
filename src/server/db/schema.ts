@@ -101,6 +101,18 @@ export const projectsRelations = relations(projects, ({ one }) => ({
 }));
 
 
+// Settings table for watermark configuration
+export const settings = createTable("settings", {
+  id: serial("id").primaryKey(),
+  key: varchar("key", { length: 255 }).notNull().unique(),
+  value: json("value").notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true })
+    .$onUpdate(() => new Date())
+    .default(sql`CURRENT_TIMESTAMP`),
+  updatedBy: varchar("updated_by", { length: 255 })
+    .references(() => users.id, { onDelete: "set null" }),
+});
+
 export const usersRelations = relations(users, ({ many }) => ({
   projects: many(projects),
 }));
@@ -108,6 +120,7 @@ export const usersRelations = relations(users, ({ many }) => ({
 export type Category = InferSelectModel<typeof categories>;
 export type Project = InferSelectModel<typeof projects>;
 export type User = InferSelectModel<typeof users>;
+export type Setting = InferSelectModel<typeof settings>;
 
 
 

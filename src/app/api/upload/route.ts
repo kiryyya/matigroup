@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireTelegramAdmin } from "~/server/telegram-auth";
 import { uploadPrivateObject, uploadPublicObject } from "~/lib/storage";
+import { addWatermarkToImage } from "~/lib/watermark";
+import { db } from "~/server/db";
+import { settings } from "~/server/db/schema";
+import { eq } from "drizzle-orm";
 
 // Force dynamic rendering - don't execute during build
 export const dynamic = 'force-dynamic';
@@ -35,7 +39,48 @@ export async function POST(request: NextRequest) {
     }
 
     const arrayBuffer = await file.arrayBuffer();
-    const body = new Uint8Array(arrayBuffer);
+    let body = new Uint8Array(arrayBuffer);
+    
+    // Если это изображение и это оригинал (не preview), применяем водяной знак
+    if (isImage && variant === "original") {
+      try {
+        // Загружаем настройки водяного знака из БД
+        const watermarkSetting = await db.query.settings.findFirst({
+          where: eq(settings.key, 'watermark'),
+        });
+
+        if (watermarkSetting) {
+          const watermarkConfig = watermarkSetting.value as {
+            enabled?: boolean;
+            text?: string;
+            opacity?: number;
+            fontSize?: number;
+            color?: { r: number; g: number; b: number };
+            angle?: number;
+            position?: string;
+          };
+
+          // Применяем водяной знак, если он включен
+          if (watermarkConfig.enabled !== false) {
+            const imageBuffer = Buffer.from(body);
+            const watermarkedBuffer = await addWatermarkToImage(imageBuffer, {
+              enabled: watermarkConfig.enabled ?? true,
+              text: watermarkConfig.text ?? 'Matigroup',
+              opacity: watermarkConfig.opacity ?? 0.15,
+              fontSize: watermarkConfig.fontSize ?? 48,
+              color: watermarkConfig.color ?? { r: 0, g: 0, b: 0 },
+              angle: watermarkConfig.angle ?? -45,
+              position: (watermarkConfig.position as any) ?? 'center',
+            });
+            body = new Uint8Array(watermarkedBuffer);
+          }
+        }
+      } catch (error) {
+        console.error("Ошибка при применении водяного знака:", error);
+        // Продолжаем с оригинальным изображением в случае ошибки
+      }
+    }
+
     const safeName = sanitizeFileName(file.name || "file");
     const id = crypto.randomUUID();
     const key = isImage
@@ -52,7 +97,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({
         key,
         url,
-        size: file.size,
+        size: body.length,
         mimeType: file.type || "application/octet-stream",
         originalName: file.name,
         variant,
