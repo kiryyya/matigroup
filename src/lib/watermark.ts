@@ -478,13 +478,15 @@ async function addImageWatermark(
   }
   
   // Если уже есть alpha канал, создаем новое изображение с измененным alpha
-  const watermarkWithOpacity = sharp(pixels, {
+  const watermarkWithOpacityBuffer = await sharp(pixels, {
     raw: {
       width: scaledWidth,
       height: scaledHeight,
       channels: 4,
     },
-  });
+  })
+    .png()
+    .toBuffer();
   
   // Вычисляем позицию
   let left = 0;
@@ -516,7 +518,7 @@ async function addImageWatermark(
   return image
     .composite([
       {
-        input: watermarkWithOpacity,
+        input: watermarkWithOpacityBuffer,
         left,
         top,
         blend: 'over',
