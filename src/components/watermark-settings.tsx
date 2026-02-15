@@ -113,12 +113,31 @@ export default function WatermarkSettings() {
     }
 
     try {
-      // Загружаем изображение
-      const result = await uploadFile({
-        file,
-        kind: 'image',
-        variant: 'original',
+      // Загружаем изображение через специальный API endpoint для водяного знака
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("kind", "image");
+      formData.append("variant", "original");
+      formData.append("isWatermark", "true");
+
+      const initData =
+        typeof window !== "undefined"
+          ? window.Telegram?.WebApp?.initData ?? ""
+          : "";
+
+      const response = await fetch("/api/upload", {
+        method: "POST",
+        headers: {
+          "x-telegram-init-data": initData,
+        },
+        body: formData,
       });
+
+      if (!response.ok) {
+        throw new Error("Ошибка загрузки изображения");
+      }
+
+      const result = await response.json();
 
       // Сохраняем ключ изображения в настройках
       uploadWatermarkImage.mutate({ imageKey: result.key });
