@@ -393,9 +393,21 @@ export const projectsRouter = createTRPCRouter({
         });
         if (project) {
           const imagesArray = parseImages(project.images);
+          const transformedImages = transformImages(imagesArray);
+          
+          // Для списка избранного возвращаем только первое изображение
+          // Если есть previewUrl, используем его, иначе url
+          const firstImage = transformedImages.length > 0 ? transformedImages[0] : null;
+          const listImage = firstImage ? {
+            ...firstImage,
+            // В списке всегда используем previewUrl если есть, иначе url
+            url: firstImage.previewUrl ?? firstImage.url,
+          } : null;
+          
           projectsData.push({
             ...project,
-            images: transformImages(imagesArray),
+            images: listImage ? [listImage] : [], // Только первое изображение для превью
+            attachments: [], // Без вложений в списке
           });
         }
       }
