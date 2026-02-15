@@ -90,6 +90,10 @@ async function checkOrCreateUser(webAppUser: TelegramWebApps.WebAppUser) {
     return null;
   }
 
+  // Логируем весь объект webAppUser для отладки
+  console.log('[telegram-auth] Full webAppUser object:', JSON.stringify(webAppUser, null, 2));
+  console.log('[telegram-auth] webAppUser.username:', webAppUser.username, 'type:', typeof webAppUser.username);
+
   const telegramId = webAppUser.id.toString();
 
   let user = await db.query.users.findFirst({
