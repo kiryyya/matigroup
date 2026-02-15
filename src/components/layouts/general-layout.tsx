@@ -1,10 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import React, { useEffect, useState, type PropsWithChildren } from "react";
 import useTelegramInitData from "~/hooks/use-telegram-init-data";
-import { Heart, Home, Settings, ArrowLeft } from "lucide-react";
+import useTelegramBackButton from "~/hooks/use-telegram-back-button";
+import { Heart, Home, Settings } from "lucide-react";
 import { api } from "~/trpc/react";
 import { cn } from "~/lib/utils";
 import { useModal } from "~/contexts/modal-context";
@@ -12,16 +13,13 @@ import { useModal } from "~/contexts/modal-context";
 const GeneralLayout = ({ children }: PropsWithChildren) => {
   const { data: user } = api.tg.getUser.useQuery();
   const pathname = usePathname();
-  const router = useRouter();
   const { isModalOpen } = useModal();
 
   const [shouldShowAlert, setShouldShowAlert] = useState<string | null>(null);
   const { start_param } = useTelegramInitData();
 
-  // Определяем, нужно ли показывать кнопку "Назад"
-  // Показываем кнопку "Назад" если не на главной странице
-  // Исключаем только модальное окно создания проекта, но не диалоги с документами
-  const shouldShowBackButton = pathname !== "/" && !isModalOpen;
+  // Управление системной кнопкой "Назад" от Telegram
+  useTelegramBackButton();
 
   useEffect(() => {
     if (!user?.telegramId || !start_param) {
@@ -44,18 +42,6 @@ const GeneralLayout = ({ children }: PropsWithChildren) => {
       <div className="h-screen overflow-y-auto overflow-x-hidden scrollbar-hide">
         <main className="w-full">
           <div className="h-full max-w-full px-4 py-4 md:max-w-screen-lg lg:px-8">
-            {/* Кнопка "Назад" */}
-            {shouldShowBackButton && (
-              <div className="mb-4">
-                <button
-                  onClick={() => router.back()}
-                  className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors shadow-sm"
-                >
-                  <ArrowLeft className="h-4 w-4" />
-                  Назад
-                </button>
-              </div>
-            )}
             {children}
           </div>
         </main>
