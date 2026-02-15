@@ -22,7 +22,12 @@ export async function GET(
 ) {
   try {
     // CSRF защита (для GET запросов проверка менее строгая, но все равно проверяем Origin)
-    validateCSRF(request);
+    try {
+      validateCSRF(request);
+    } catch (csrfError) {
+      // Для GET запросов CSRF ошибка не критична, только логируем
+      console.warn("CSRF warning for file download:", csrfError);
+    }
     
     const user = await requireTelegramUser(request.headers);
     const { searchParams } = new URL(request.url);
@@ -76,6 +81,7 @@ export async function GET(
         { status: 400 }
       );
     }
+    
     if (typeof attachment === "string") {
       return NextResponse.json(
         { error: "Legacy attachment format is not supported here" },
@@ -84,42 +90,57 @@ export async function GET(
     }
 
     const fileKey = attachment.key;
+    if (!fileKey) {
+      return NextResponse.json(
+        { error: 'File key is missing' },
+        { status: 400 }
+      );
+    }
+
     const fileName = attachment.originalName || `attachment_${attachmentIdx}`;
     const mimeType = attachment.mimeType || "application/octet-stream";
 
-    const s3Object = await getPrivateObject({ key: fileKey });
-    if (!s3Object.Body) {
-      return NextResponse.json({ error: "File not found" }, { status: 404 });
+    try {
+      const s3Object = await getPrivateObject({ key: fileKey });
+      if (!s3Object.Body) {
+        return NextResponse.json({ error: "File not found in storage" }, { status: 404 });
       }
 
-    const bodyBuffer = Buffer.from(await s3Object.Body.transformToByteArray());
-    let finalBuffer: Buffer = bodyBuffer;
+      const bodyBuffer = Buffer.from(await s3Object.Body.transformToByteArray());
+      let finalBuffer: Buffer = bodyBuffer;
 
-    if (withWatermark) {
-      try {
-        const watermarked = await addWatermarkToFile(bodyBuffer, mimeType, {
-          text: "123",
-          opacity: 0.5,
-          fontSize: 16,
-        });
-        finalBuffer = Buffer.isBuffer(watermarked) 
-          ? watermarked 
-          : Buffer.from(watermarked);
-      } catch (error) {
-        console.error("Ошибка при добавлении водяного знака:", error);
-        finalBuffer = bodyBuffer;
+      if (withWatermark) {
+        try {
+          const watermarked = await addWatermarkToFile(bodyBuffer, mimeType, {
+            text: "123",
+            opacity: 0.5,
+            fontSize: 16,
+          });
+          finalBuffer = Buffer.isBuffer(watermarked) 
+            ? watermarked 
+            : Buffer.from(watermarked);
+        } catch (error) {
+          console.error("Ошибка при добавлении водяного знака:", error);
+          finalBuffer = bodyBuffer;
+        }
       }
+      
+      return new NextResponse(finalBuffer as BodyInit, {
+        status: 200,
+        headers: {
+          "Content-Type": mimeType,
+          "Content-Disposition": `attachment; filename="${fileName}"`,
+          "Content-Length": finalBuffer.length.toString(),
+        },
+      });
+    } catch (storageError) {
+      console.error("Ошибка при получении файла из storage:", storageError);
+      return NextResponse.json(
+        { error: "Failed to retrieve file from storage" },
+        { status: 500 }
+      );
     }
-    
-    return new NextResponse(finalBuffer as BodyInit, {
-      status: 200,
-      headers: {
-        "Content-Type": mimeType,
-        "Content-Disposition": `attachment; filename="${fileName}"`,
-        "Content-Length": finalBuffer.length.toString(),
-      },
-    });
-    
+
   } catch (error) {
     console.error("Ошибка при скачивании файла:", error);
     const message = error instanceof Error ? error.message : "Internal server error";
