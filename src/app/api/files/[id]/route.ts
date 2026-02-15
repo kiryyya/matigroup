@@ -5,6 +5,7 @@ import { and, eq } from "drizzle-orm";
 import { addWatermarkToFile } from "~/lib/watermark";
 import { getPrivateObject } from "~/lib/storage";
 import { requireTelegramUser } from "~/server/telegram-auth";
+import { validateCSRF } from "~/lib/csrf";
 
 // Force dynamic rendering - don't execute during build
 export const dynamic = 'force-dynamic';
@@ -20,6 +21,9 @@ export async function GET(
   { params }: RouteParams
 ) {
   try {
+    // CSRF защита (для GET запросов проверка менее строгая, но все равно проверяем Origin)
+    validateCSRF(request);
+    
     const user = await requireTelegramUser(request.headers);
     const { searchParams } = new URL(request.url);
     const withWatermark = searchParams.get('watermark') === 'true';

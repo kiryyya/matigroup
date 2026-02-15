@@ -5,6 +5,7 @@ import { addWatermarkToImage } from "~/lib/watermark";
 import { db } from "~/server/db";
 import { settings } from "~/server/db/schema";
 import { eq } from "drizzle-orm";
+import { validateCSRF } from "~/lib/csrf";
 
 // Force dynamic rendering - don't execute during build
 export const dynamic = 'force-dynamic';
@@ -18,6 +19,9 @@ function sanitizeFileName(name: string) {
 
 export async function POST(request: NextRequest) {
   try {
+    // CSRF защита
+    validateCSRF(request);
+    
     await requireTelegramAdmin(request.headers);
 
     const formData = await request.formData();
