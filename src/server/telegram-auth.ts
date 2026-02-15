@@ -103,9 +103,22 @@ async function checkOrCreateUser(webAppUser: TelegramWebApps.WebAppUser) {
         telegramId,
         name: `${webAppUser.first_name} ${webAppUser.last_name}`.trim(),
         image: webAppUser.photo_url,
+        username: webAppUser.username ?? null,
       })
       .returning()
       .then((r) => r[0]);
+  } else {
+    // Обновляем username если он изменился или был добавлен
+    if (webAppUser.username !== undefined) {
+      await db
+        .update(users)
+        .set({ username: webAppUser.username ?? null })
+        .where(eq(users.telegramId, telegramId));
+      // Обновляем локальный объект user
+      user = await db.query.users.findFirst({
+        where: eq(users.telegramId, telegramId),
+      }) ?? user;
+    }
   }
 
   return user;

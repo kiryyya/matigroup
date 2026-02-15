@@ -32,6 +32,7 @@ export const users = createTable("user", {
   }).default(sql`CURRENT_TIMESTAMP`),
   image: varchar("image", { length: 255 }),
   telegramId: varchar("telegram_id", { length: 255 }).notNull(),
+  username: varchar("username", { length: 255 }),
   chatId: varchar("chat_id", { length: 255 }),
   role: varchar("role", { length: 255 })
     .notNull()

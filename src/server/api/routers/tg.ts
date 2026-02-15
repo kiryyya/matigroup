@@ -3,7 +3,7 @@ import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { db } from "~/server/db";
 import { users } from "~/server/db/schema";
-import { ilike, or, eq } from "drizzle-orm";
+import { ilike, or, eq, and, isNotNull } from "drizzle-orm";
 
 export const tgRouter = createTRPCRouter({
   getUser: procedure.query(async ({ ctx }) => {
@@ -21,6 +21,22 @@ export const tgRouter = createTRPCRouter({
         });
       }
 
+      // Собираем условия для поиска
+      const searchConditions = [
+        ilike(users.name, `%${input.query}%`),
+        ilike(users.email, `%${input.query}%`),
+        eq(users.id, input.query),
+        eq(users.telegramId, input.query),
+      ];
+
+      // Добавляем поиск по username только если поле не null
+      // Используем явную проверку через and
+      const usernameCondition = and(
+        isNotNull(users.username),
+        ilike(users.username, `%${input.query}%`)
+      );
+      searchConditions.push(usernameCondition);
+
       const foundUsers = await db
         .select({
           id: users.id,
@@ -28,14 +44,10 @@ export const tgRouter = createTRPCRouter({
           email: users.email,
           role: users.role,
           telegramId: users.telegramId,
+          username: users.username,
         })
         .from(users)
-        .where(
-          or(
-            ilike(users.name, `%${input.query}%`),
-            ilike(users.email, `%${input.query}%`)
-          )
-        )
+        .where(or(...searchConditions))
         .limit(20);
 
       return foundUsers;
@@ -73,6 +85,7 @@ export const tgRouter = createTRPCRouter({
           email: users.email,
           role: users.role,
           telegramId: users.telegramId,
+          username: users.username,
         });
 
       if (updatedUser.length === 0) {
