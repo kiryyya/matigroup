@@ -66,6 +66,13 @@ export async function POST(request: NextRequest) {
             watermarkImageKey?: string;
           };
 
+          console.log('Watermark config:', {
+            enabled: watermarkConfig.enabled,
+            useImage: watermarkConfig.useImage,
+            hasImageKey: !!watermarkConfig.watermarkImageKey,
+            hasText: !!watermarkConfig.text,
+          });
+
           // Применяем водяной знак, если он включен
           if (watermarkConfig.enabled !== false) {
             const imageBuffer = Buffer.from(body);
@@ -91,6 +98,12 @@ export async function POST(request: NextRequest) {
             // Если useImage=true, но изображение не загрузилось, используем текст
             const useImageWatermark = watermarkConfig.useImage && watermarkImageBuffer !== undefined;
             
+            console.log('Applying watermark:', {
+              useImageWatermark,
+              hasImageBuffer: !!watermarkImageBuffer,
+              willUseText: !useImageWatermark,
+            });
+            
             const watermarkedBuffer = await addWatermarkToImage(imageBuffer, {
               enabled: watermarkConfig.enabled ?? true,
               // Если используем изображение, текст не нужен, иначе используем текст
@@ -103,7 +116,12 @@ export async function POST(request: NextRequest) {
               imageWatermark: useImageWatermark ? watermarkImageBuffer : undefined,
             });
             body = new Uint8Array(watermarkedBuffer);
+            console.log('Watermark applied successfully');
+          } else {
+            console.log('Watermark is disabled in config');
           }
+        } else {
+          console.log('Watermark settings not found in database');
         }
       } catch (error) {
         console.error("Ошибка при применении водяного знака:", error);
