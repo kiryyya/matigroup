@@ -2,7 +2,7 @@ import { db } from "~/server/db";
 import { createTRPCRouter, procedure } from "../trpc";
 import { z } from "zod";
 import { categories, projects, users } from "~/server/db/schema";
-import { eq, and, desc } from "drizzle-orm";
+import { eq, and, desc, lt } from "drizzle-orm";
 import type { StoredImage } from "~/types/files";
 
 // Вспомогательная функция для парсинга изображений из JSON
@@ -98,32 +98,64 @@ export const projectsRouter = createTRPCRouter({
     });
   }),
 
-  // Get projects by category
+  // Get projects by category with pagination
   projectsByCategory: procedure
-    .input(z.object({ categorySlug: z.string() }))
+    .input(
+      z.object({
+        categorySlug: z.string(),
+        limit: z.number().min(1).max(50).default(10),
+        cursor: z.number().optional(),
+      })
+    )
     .query(async ({ input }) => {
       const category = await db.query.categories.findFirst({
         where: eq(categories.slug, input.categorySlug),
       });
 
       if (!category) {
-        return [];
+        return {
+          items: [],
+          nextCursor: undefined,
+        };
+      }
+
+      const limit = input.limit ?? 10;
+      const cursor = input.cursor;
+
+      // Строим условие where с учетом cursor
+      const whereConditions = [
+        eq(projects.categoryId, category.id),
+        eq(projects.status, "published"),
+      ];
+
+      // Если есть cursor, добавляем условие для пагинации
+      // Используем ID для cursor-based пагинации (ищем проекты с ID меньше cursor)
+      if (cursor) {
+        whereConditions.push(lt(projects.id, cursor));
       }
 
       const projectsData = await db.query.projects.findMany({
-        where: and(
-          eq(projects.categoryId, category.id),
-          eq(projects.status, "published")
-        ),
+        where: and(...whereConditions),
         with: {
           category: true,
           user: true,
         },
-        orderBy: [desc(projects.createdAt)],
+        orderBy: [desc(projects.createdAt), desc(projects.id)], // Сортируем по дате создания и ID для стабильной пагинации
+        limit: limit + 1, // Загружаем на 1 больше, чтобы проверить есть ли еще данные
       });
 
+      // Проверяем, есть ли следующая страница
+      let nextCursor: number | undefined = undefined;
+      if (projectsData.length > limit) {
+        const nextItem = projectsData[limit];
+        nextCursor = nextItem?.id;
+      }
+
+      // Берем только нужное количество элементов
+      const items = projectsData.slice(0, limit);
+
       // Оптимизируем данные для списка
-      return projectsData.map(project => {
+      const transformedItems = items.map(project => {
         const imagesArray = parseImages(project.images);
         const transformedImages = transformImages(imagesArray);
         
@@ -142,6 +174,11 @@ export const projectsRouter = createTRPCRouter({
           attachments: [], // Без вложений в списке
         };
       });
+
+      return {
+        items: transformedItems,
+        nextCursor,
+      };
     }),
 
   // Get single project
@@ -365,61 +402,95 @@ export const projectsRouter = createTRPCRouter({
     }),
 
   // Favorites API
-  // Get user's favorites
-  favorites: procedure.query(async ({ ctx }) => {
-    try {
-      // Get user with favorites
-      const user = await db.query.users.findFirst({
-        where: eq(users.id, ctx.user.id),
-        columns: { favorites: true },
-      });
+  // Get user's favorites with pagination
+  favorites: procedure
+    .input(
+      z.object({
+        limit: z.number().min(1).max(50).default(10),
+        cursor: z.number().optional(),
+      }).optional()
+    )
+    .query(async ({ input, ctx }) => {
+      try {
+        const limit = input?.limit ?? 10;
+        const cursor = input?.cursor;
 
-      if (!user?.favorites || user.favorites.length === 0) {
-        return [];
-      }
-
-      // Get projects for each favorite
-      const projectsData = [];
-      for (const projectId of user.favorites) {
-        const project = await db.query.projects.findFirst({
-          where: and(
-            eq(projects.id, projectId),
-            eq(projects.status, "published")
-          ),
-          with: {
-            category: true,
-            user: true,
-          },
+        // Get user with favorites
+        const user = await db.query.users.findFirst({
+          where: eq(users.id, ctx.user.id),
+          columns: { favorites: true },
         });
-        if (project) {
-          const imagesArray = parseImages(project.images);
-          const transformedImages = transformImages(imagesArray);
-          
-          // Для списка избранного возвращаем только первое изображение
-          // Если есть previewUrl, используем его, иначе url
-          const firstImage = transformedImages.length > 0 ? transformedImages[0] : null;
-          const listImage = firstImage ? {
-            ...firstImage,
-            // В списке всегда используем previewUrl если есть, иначе url
-            // Сохраняем оба URL для совместимости с фронтендом
-            url: firstImage.previewUrl ?? firstImage.url,
-            previewUrl: firstImage.previewUrl ?? firstImage.url,
-          } : null;
-          
-          projectsData.push({
-            ...project,
-            images: listImage ? [listImage] : [], // Только первое изображение для превью
-            attachments: [], // Без вложений в списке
-          });
-        }
-      }
 
-      return projectsData;
-    } catch (error) {
-      console.error("Error fetching favorites:", error);
-      return [];
-    }
-  }),
+        if (!user?.favorites || user.favorites.length === 0) {
+          return {
+            items: [],
+            nextCursor: undefined,
+          };
+        }
+
+        // Для favorites используем offset-based пагинацию через cursor
+        // cursor - это offset (количество уже загруженных элементов)
+        const offset = cursor ?? 0;
+        const favoriteIds = user.favorites.slice(offset, offset + limit + 1);
+        const hasNextPage = favoriteIds.length > limit;
+
+        // Берем только нужное количество элементов
+        const idsToFetch = favoriteIds.slice(0, limit);
+
+        // Get projects for each favorite
+        const projectsData = [];
+        for (const projectId of idsToFetch) {
+          const project = await db.query.projects.findFirst({
+            where: and(
+              eq(projects.id, projectId),
+              eq(projects.status, "published")
+            ),
+            with: {
+              category: true,
+              user: true,
+            },
+          });
+          if (project) {
+            const imagesArray = parseImages(project.images);
+            const transformedImages = transformImages(imagesArray);
+            
+            // Для списка избранного возвращаем только первое изображение
+            // Если есть previewUrl, используем его, иначе url
+            const firstImage = transformedImages.length > 0 ? transformedImages[0] : null;
+            const listImage = firstImage ? {
+              ...firstImage,
+              // В списке всегда используем previewUrl если есть, иначе url
+              // Сохраняем оба URL для совместимости с фронтендом
+              url: firstImage.previewUrl ?? firstImage.url,
+              previewUrl: firstImage.previewUrl ?? firstImage.url,
+            } : null;
+            
+            projectsData.push({
+              ...project,
+              images: listImage ? [listImage] : [], // Только первое изображение для превью
+              attachments: [], // Без вложений в списке
+            });
+          }
+        }
+
+        // Определяем nextCursor (offset для следующей страницы)
+        let nextCursor: number | undefined = undefined;
+        if (hasNextPage) {
+          nextCursor = offset + limit;
+        }
+
+        return {
+          items: projectsData,
+          nextCursor,
+        };
+      } catch (error) {
+        console.error("Error fetching favorites:", error);
+        return {
+          items: [],
+          nextCursor: undefined,
+        };
+      }
+    }),
 
   // Add to favorites
   addToFavorites: procedure

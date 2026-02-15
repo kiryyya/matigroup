@@ -10,7 +10,7 @@ import { Search, X } from "lucide-react";
 import FilterModal, { type FilterOptions } from "~/components/filter-modal";
 import FavoriteButton from "~/components/favorite-button";
 import Loader from "~/components/ui/loader";
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 
 interface CategoryPageProps {
   params: {
@@ -33,9 +33,27 @@ const categoryIcons: Record<string, string> = {
 };
 
 export default function CategoryPage({ params }: CategoryPageProps) {
-  const { data: projects, isLoading } = api.projects.projectsByCategory.useQuery({
-    categorySlug: params.slug,
-  });
+  const {
+    data,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+    isLoading,
+  } = api.projects.projectsByCategory.useInfiniteQuery(
+    {
+      categorySlug: params.slug,
+      limit: 10,
+    },
+    {
+      getNextPageParam: (lastPage) => lastPage.nextCursor,
+    }
+  );
+
+  // Объединяем все страницы в один массив
+  const projects = useMemo(() => {
+    return data?.pages.flatMap((page) => page.items) ?? [];
+  }, [data]);
+
   // Управление доступом/редактированием перенесено на страницу проекта
 
   const [filters, setFilters] = useState<FilterOptions>({
@@ -48,9 +66,35 @@ export default function CategoryPage({ params }: CategoryPageProps) {
   const categoryName = categoryNames[params.slug] ?? "Категория";
   const categoryIcon = categoryIcons[params.slug] ?? "📁";
 
+  // Ref для элемента, который будет триггерить загрузку следующей страницы
+  const loadMoreRef = useRef<HTMLDivElement>(null);
+
+  // Intersection Observer для автоматической подгрузки
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0]?.isIntersecting && hasNextPage && !isFetchingNextPage) {
+          fetchNextPage();
+        }
+      },
+      { threshold: 0.1 }
+    );
+
+    const currentRef = loadMoreRef.current;
+    if (currentRef) {
+      observer.observe(currentRef);
+    }
+
+    return () => {
+      if (currentRef) {
+        observer.unobserve(currentRef);
+      }
+    };
+  }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
+
   // Фильтрация и сортировка проектов
   const filteredProjects = useMemo(() => {
-    if (!projects) return [];
+    if (!projects || projects.length === 0) return [];
 
     let filtered = [...projects];
 
@@ -153,54 +197,61 @@ export default function CategoryPage({ params }: CategoryPageProps) {
       </div>
 
       {filteredProjects && filteredProjects.length > 0 ? (
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {filteredProjects.map((project) => (
-            <Card key={project.id} className="cursor-pointer transition-all hover:shadow-lg relative overflow-hidden aspect-square rounded-2xl">
-              <Link href={`/project/${project.id}`} className="block">
-                {project.images && project.images.length > 0 ? (
-                  <>
-                    {/* Фоновое изображение */}
-                    <div className="absolute inset-0 z-0">
-                      <img
-                        src={project.images?.[0]?.previewUrl ?? project.images?.[0]?.url ?? ''}
-                        alt={project.title}
-                        className="h-full w-full object-cover"
-                        loading="lazy"
-                        decoding="async"
-                        onError={(e) => {
-                          const target = e.target as HTMLImageElement;
-                          target.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAwIiBoZWlnaHQ9IjMwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjZjNmNGY2Ii8+PHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtZmFtaWx5PSJBcmlhbCIgZm9udC1zaXplPSIxNCIgZmlsbD0iIzY2NjY2NiIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZHk9Ii4zZW0iPlByZXZpZXc8L3RleHQ+PC9zdmc+';
-                        }}
-                      />
-                      {/* Темный оверлей для лучшей читаемости текста */}
-                      <div className="absolute inset-0 bg-black/30" />
-                    </div>
-                    
-                    {/* Нижний градиент с названием */}
-                    <div className="absolute inset-x-0 bottom-0 z-10 p-4 pt-10 bg-gradient-to-t from-black/80 to-transparent">
-                      <CardTitle className="text-white line-clamp-2">{project.title}</CardTitle>
-                    </div>
-
-                    {/* Кнопка избранного справа сверху */}
-                    <div className="absolute top-2 right-2 z-20">
-                      <div onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}>
-                        <FavoriteButton projectId={project.id} />
+        <>
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {filteredProjects.map((project) => (
+              <Card key={project.id} className="cursor-pointer transition-all hover:shadow-lg relative overflow-hidden aspect-square rounded-2xl">
+                <Link href={`/project/${project.id}`} className="block">
+                  {project.images && project.images.length > 0 ? (
+                    <>
+                      {/* Фоновое изображение */}
+                      <div className="absolute inset-0 z-0">
+                        <img
+                          src={project.images?.[0]?.previewUrl ?? project.images?.[0]?.url ?? ''}
+                          alt={project.title}
+                          className="h-full w-full object-cover"
+                          loading="lazy"
+                          decoding="async"
+                          onError={(e) => {
+                            const target = e.target as HTMLImageElement;
+                            target.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAwIiBoZWlnaHQ9IjMwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjZjNmNGY2Ii8+PHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtZmFtaWx5PSJBcmlhbCIgZm9udC1zaXplPSIxNCIgZmlsbD0iIzY2NjY2NiIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZHk9Ii4zZW0iPlByZXZpZXc8L3RleHQ+PC9zdmc+';
+                          }}
+                        />
+                        {/* Темный оверлей для лучшей читаемости текста */}
+                        <div className="absolute inset-0 bg-black/30" />
                       </div>
-                    </div>
-                  </>
-                ) : (
-                  <>
-                    {/* Плейсхолдер без изображения */}
-                    <div className="absolute inset-0 bg-muted" />
-                    <div className="absolute inset-x-0 bottom-0 z-10 p-4 pt-10 bg-gradient-to-t from-black/80 to-transparent">
-                      <CardTitle className="text-white line-clamp-2">{project.title}</CardTitle>
-                    </div>
-                  </>
-                )}
-              </Link>
-            </Card>
-          ))}
-        </div>
+                      
+                      {/* Нижний градиент с названием */}
+                      <div className="absolute inset-x-0 bottom-0 z-10 p-4 pt-10 bg-gradient-to-t from-black/80 to-transparent">
+                        <CardTitle className="text-white line-clamp-2">{project.title}</CardTitle>
+                      </div>
+
+                      {/* Кнопка избранного справа сверху */}
+                      <div className="absolute top-2 right-2 z-20">
+                        <div onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}>
+                          <FavoriteButton projectId={project.id} />
+                        </div>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      {/* Плейсхолдер без изображения */}
+                      <div className="absolute inset-0 bg-muted" />
+                      <div className="absolute inset-x-0 bottom-0 z-10 p-4 pt-10 bg-gradient-to-t from-black/80 to-transparent">
+                        <CardTitle className="text-white line-clamp-2">{project.title}</CardTitle>
+                      </div>
+                    </>
+                  )}
+                </Link>
+              </Card>
+            ))}
+          </div>
+          
+          {/* Элемент для триггера загрузки следующей страницы */}
+          <div ref={loadMoreRef} className="h-20 flex items-center justify-center">
+            {isFetchingNextPage && <Loader />}
+          </div>
+        </>
       ) : (
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-12">

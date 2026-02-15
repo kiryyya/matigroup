@@ -6,12 +6,57 @@ import { Badge } from "~/components/ui/badge";
 import Loader from "~/components/ui/loader";
 import { Heart, Calendar, User, MapPin } from "lucide-react";
 import Link from "next/link";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 
 export default function FavoritesPage() {
-  const { data: favorites, isLoading } = api.projects.favorites.useQuery();
+  const {
+    data,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+    isLoading,
+  } = api.projects.favorites.useInfiniteQuery(
+    {
+      limit: 10,
+    },
+    {
+      getNextPageParam: (lastPage) => lastPage.nextCursor,
+    }
+  );
+
+  // Объединяем все страницы в один массив
+  const favorites = useMemo(() => {
+    return data?.pages.flatMap((page) => page.items) ?? [];
+  }, [data]);
+
   const [removingIds, setRemovingIds] = useState<Set<number>>(new Set());
   const utils = api.useUtils();
+
+  // Ref для элемента, который будет триггерить загрузку следующей страницы
+  const loadMoreRef = useRef<HTMLDivElement>(null);
+
+  // Intersection Observer для автоматической подгрузки
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0]?.isIntersecting && hasNextPage && !isFetchingNextPage) {
+          fetchNextPage();
+        }
+      },
+      { threshold: 0.1 }
+    );
+
+    const currentRef = loadMoreRef.current;
+    if (currentRef) {
+      observer.observe(currentRef);
+    }
+
+    return () => {
+      if (currentRef) {
+        observer.unobserve(currentRef);
+      }
+    };
+  }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
 
   const removeFromFavorites = api.projects.removeFromFavorites.useMutation({
     onSuccess: async () => {
@@ -145,6 +190,11 @@ export default function FavoritesPage() {
             </Link>
           </Card>
         ))}
+      </div>
+      
+      {/* Элемент для триггера загрузки следующей страницы */}
+      <div ref={loadMoreRef} className="h-20 flex items-center justify-center">
+        {isFetchingNextPage && <Loader />}
       </div>
     </div>
   );
