@@ -44,15 +44,22 @@ export default function EditProjectModal({ isOpen, onClose, project }: EditProje
   const utils = api.useUtils();
   const updateProject = api.projects.update.useMutation({
     onSuccess: async () => {
+      // Инвалидируем и обновляем кэш для обновления списков
       await utils.projects.categories.invalidate();
+      await utils.projects.categories.refetch();
       await utils.projects.featured.invalidate();
+      await utils.projects.featured.refetch();
       await utils.projects.allProjects.invalidate();
+      await utils.projects.allProjects.refetch();
       await utils.projects.favorites.invalidate();
+      await utils.projects.favorites.refetch();
       // Важно: сбросить списки по категориям (и старой, и новой)
       await utils.projects.projectsByCategory.invalidate();
       if (project?.id) {
         await utils.projects.project.invalidate({ id: project.id });
+        await utils.projects.project.refetch({ id: project.id });
         await utils.projects.projectFull.invalidate({ id: project.id });
+        await utils.projects.projectFull.refetch({ id: project.id });
       }
     },
   });

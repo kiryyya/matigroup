@@ -16,11 +16,15 @@ export default function FavoritesPage() {
 
   const removeFromFavorites = api.projects.removeFromFavorites.useMutation({
     onSuccess: async () => {
-      // Инвалидируем все связанные запросы
+      // Инвалидируем и обновляем все связанные запросы
       await utils.projects.favorites.invalidate();
+      await utils.projects.favorites.refetch();
       await utils.projects.isFavorite.invalidate();
       await utils.projects.allProjects.invalidate();
+      await utils.projects.allProjects.refetch();
       await utils.projects.featured.invalidate();
+      await utils.projects.featured.refetch();
+      // Инвалидируем все категории (без параметров инвалидирует все варианты)
       await utils.projects.projectsByCategory.invalidate();
     },
   });

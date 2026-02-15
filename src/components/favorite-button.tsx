@@ -16,21 +16,31 @@ export default function FavoriteButton({ projectId, className = "" }: FavoriteBu
   const { data: isFavorite } = api.projects.isFavorite.useQuery({ projectId });
   const addToFavorites = api.projects.addToFavorites.useMutation({
     onSuccess: async () => {
-      // Инвалидируем все связанные запросы
+      // Инвалидируем и обновляем все связанные запросы
       await utils.projects.isFavorite.invalidate({ projectId });
+      await utils.projects.isFavorite.refetch({ projectId });
       await utils.projects.favorites.invalidate();
+      await utils.projects.favorites.refetch();
       await utils.projects.allProjects.invalidate();
+      await utils.projects.allProjects.refetch();
       await utils.projects.featured.invalidate();
+      await utils.projects.featured.refetch();
+      // Инвалидируем все категории (без параметров инвалидирует все варианты)
       await utils.projects.projectsByCategory.invalidate();
     },
   });
   const removeFromFavorites = api.projects.removeFromFavorites.useMutation({
     onSuccess: async () => {
-      // Инвалидируем все связанные запросы
+      // Инвалидируем и обновляем все связанные запросы
       await utils.projects.isFavorite.invalidate({ projectId });
+      await utils.projects.isFavorite.refetch({ projectId });
       await utils.projects.favorites.invalidate();
+      await utils.projects.favorites.refetch();
       await utils.projects.allProjects.invalidate();
+      await utils.projects.allProjects.refetch();
       await utils.projects.featured.invalidate();
+      await utils.projects.featured.refetch();
+      // Инвалидируем все категории (без параметров инвалидирует все варианты)
       await utils.projects.projectsByCategory.invalidate();
     },
   });

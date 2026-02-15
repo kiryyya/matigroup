@@ -70,11 +70,17 @@ export default function ProjectPage({ params }: ProjectPageProps) {
   const utils = api.useUtils();
   const deleteProject = api.projects.delete.useMutation({
     onSuccess: async () => {
-      // Инвалидируем кэш для обновления списков
+      // Инвалидируем и обновляем кэш для обновления списков
       await utils.projects.categories.invalidate();
+      await utils.projects.categories.refetch();
       await utils.projects.featured.invalidate();
+      await utils.projects.featured.refetch();
       await utils.projects.allProjects.invalidate();
+      await utils.projects.allProjects.refetch();
       await utils.projects.favorites.invalidate();
+      await utils.projects.favorites.refetch();
+      // Инвалидируем все категории (без параметров инвалидирует все варианты)
+      await utils.projects.projectsByCategory.invalidate();
     },
   });
   const router = useRouter();
