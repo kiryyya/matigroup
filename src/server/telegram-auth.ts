@@ -97,22 +97,35 @@ async function checkOrCreateUser(webAppUser: TelegramWebApps.WebAppUser) {
   });
 
   if (!user) {
+    // Нормализуем username: если пустая строка, то null
+    const username = webAppUser.username && webAppUser.username.trim() !== "" 
+      ? webAppUser.username.trim() 
+      : null;
+    
+    console.log(`[telegram-auth] Creating user: telegramId=${telegramId}, username=${username}, webAppUser.username=${webAppUser.username}`);
+    
     user = await db
       .insert(users)
       .values({
         telegramId,
         name: `${webAppUser.first_name} ${webAppUser.last_name}`.trim(),
         image: webAppUser.photo_url,
-        username: webAppUser.username ?? null,
+        username,
       })
       .returning()
       .then((r) => r[0]);
   } else {
     // Обновляем username если он изменился или был добавлен
-    if (webAppUser.username !== undefined) {
+    const newUsername = webAppUser.username && webAppUser.username.trim() !== "" 
+      ? webAppUser.username.trim() 
+      : null;
+    
+    // Обновляем только если username изменился
+    if (user.username !== newUsername) {
+      console.log(`[telegram-auth] Updating username: telegramId=${telegramId}, old=${user.username}, new=${newUsername}`);
       await db
         .update(users)
-        .set({ username: webAppUser.username ?? null })
+        .set({ username: newUsername })
         .where(eq(users.telegramId, telegramId));
       // Обновляем локальный объект user
       user = await db.query.users.findFirst({
