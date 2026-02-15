@@ -78,6 +78,8 @@ export async function POST(request: NextRequest) {
                 if (watermarkObject.Body) {
                   const watermarkArrayBuffer = await watermarkObject.Body.transformToByteArray();
                   watermarkImageBuffer = Buffer.from(watermarkArrayBuffer);
+                } else {
+                  console.warn("Изображение водяного знака не найдено в storage, используем текстовый водяной знак");
                 }
               } catch (error) {
                 console.error("Ошибка загрузки изображения водяного знака:", error);
@@ -85,15 +87,20 @@ export async function POST(request: NextRequest) {
               }
             }
             
+            // Определяем, использовать ли изображение или текст
+            // Если useImage=true, но изображение не загрузилось, используем текст
+            const useImageWatermark = watermarkConfig.useImage && watermarkImageBuffer !== undefined;
+            
             const watermarkedBuffer = await addWatermarkToImage(imageBuffer, {
               enabled: watermarkConfig.enabled ?? true,
-              text: watermarkConfig.text ?? 'Matigroup',
+              // Если используем изображение, текст не нужен, иначе используем текст
+              text: useImageWatermark ? undefined : (watermarkConfig.text ?? 'Matigroup'),
               opacity: watermarkConfig.opacity ?? 0.15,
               fontSize: watermarkConfig.fontSize ?? 48,
               color: watermarkConfig.color ?? { r: 0, g: 0, b: 0 },
               angle: watermarkConfig.angle ?? -45,
               position: (watermarkConfig.position as any) ?? 'center',
-              imageWatermark: watermarkImageBuffer,
+              imageWatermark: useImageWatermark ? watermarkImageBuffer : undefined,
             });
             body = new Uint8Array(watermarkedBuffer);
           }

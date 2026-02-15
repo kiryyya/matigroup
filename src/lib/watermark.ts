@@ -174,22 +174,25 @@ export async function addWatermarkToImage(
     
     // Если есть изображение-водяной знак, используем его
     if (watermarkOptions.imageWatermark) {
-      return addImageWatermark(imageBuffer, watermarkOptions.imageWatermark, {
-        opacity: watermarkOptions.opacity || 0.3,
-        position: watermarkOptions.position || 'center',
-        angle: watermarkOptions.angle || 0,
-      });
+      try {
+        return await addImageWatermark(imageBuffer, watermarkOptions.imageWatermark, {
+          opacity: watermarkOptions.opacity || 0.3,
+          position: watermarkOptions.position || 'center',
+          angle: watermarkOptions.angle || 0,
+        });
+      } catch (error) {
+        console.error('Ошибка при применении изображения водяного знака, используем текстовый:', error);
+        // Если ошибка с изображением, продолжаем с текстом
+      }
     }
     
-    // Создаем SVG с текстовым водяным знаком (только если есть текст)
-    if (!watermarkOptions.text) {
-      // Если нет текста и нет изображения, возвращаем оригинал
-      return imageBuffer;
-    }
+    // Создаем SVG с текстовым водяным знаком
+    // Если нет текста, используем текст по умолчанию
+    const watermarkText = watermarkOptions.text || 'Matigroup';
     
     const fontSize = watermarkOptions.fontSize || Math.min(width, height) / 10;
     const svgText = createWatermarkSVG(
-      watermarkOptions.text,
+      watermarkText,
       fontSize,
       watermarkOptions.color || { r: 0, g: 0, b: 0 },
       watermarkOptions.opacity || 0.1,
