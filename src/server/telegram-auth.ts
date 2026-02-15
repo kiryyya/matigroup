@@ -5,6 +5,7 @@ import { env } from "~/env";
 import { db } from "~/server/db";
 import { users } from "~/server/db/schema";
 import { eq } from "drizzle-orm";
+import { bot } from "~/server/telegram";
 
 export async function getTelegramUserFromHeaders(headers: Headers) {
   const initData = headers.get("x-telegram-init-data");
@@ -35,9 +36,10 @@ export async function getTelegramUserFromHeaders(headers: Headers) {
   console.error('[telegram-auth] Raw initData user:', data.user);
   console.error('[telegram-auth] Parsed webAppUser:', JSON.stringify(webAppUser, null, 2));
   try {
-    appendFileSync('/tmp/telegram-auth.log', JSON.stringify(logData, null, 2) + '\n\n');
+    appendFileSync('/app/telegram-auth.log', JSON.stringify(logData, null, 2) + '\n\n');
   } catch (e) {
-    // Игнорируем ошибки записи в файл
+    // Логируем ошибку записи в файл
+    console.error('[telegram-auth] Error writing to log file:', e);
   }
 
   return checkOrCreateUser(webAppUser);
@@ -100,6 +102,23 @@ async function isHashValid(data: Record<string, string>, botToken: string) {
   return data.hash === hex;
 }
 
+/**
+ * Получает username пользователя через Bot API, если его нет в initData
+ */
+async function getUsernameFromBotAPI(telegramId: string): Promise<string | null> {
+  try {
+    const chat = await bot.telegram.getChat(telegramId);
+    // getChat возвращает объект с полем username для пользователей
+    if ('username' in chat && chat.username) {
+      return chat.username;
+    }
+    return null;
+  } catch (error) {
+    console.error(`[telegram-auth] Error getting username from Bot API for ${telegramId}:`, error);
+    return null;
+  }
+}
+
 async function checkOrCreateUser(webAppUser: TelegramWebApps.WebAppUser) {
   if (!webAppUser.id) {
     return null;
@@ -115,12 +134,21 @@ async function checkOrCreateUser(webAppUser: TelegramWebApps.WebAppUser) {
     where: eq(users.telegramId, telegramId),
   });
 
+  // Нормализуем username из initData: если пустая строка, то null
+  let username = webAppUser.username && webAppUser.username.trim() !== "" 
+    ? webAppUser.username.trim() 
+    : null;
+
+  // Если username нет в initData, получаем его через Bot API
+  if (!username) {
+    console.error(`[telegram-auth] Username not in initData, fetching from Bot API for telegramId=${telegramId}`);
+    username = await getUsernameFromBotAPI(telegramId);
+    if (username) {
+      console.error(`[telegram-auth] Got username from Bot API: ${username}`);
+    }
+  }
+
   if (!user) {
-    // Нормализуем username: если пустая строка, то null
-    const username = webAppUser.username && webAppUser.username.trim() !== "" 
-      ? webAppUser.username.trim() 
-      : null;
-    
     console.error(`[telegram-auth] Creating user: telegramId=${telegramId}, username=${username}, webAppUser.username=${webAppUser.username}`);
     
     user = await db
@@ -135,16 +163,12 @@ async function checkOrCreateUser(webAppUser: TelegramWebApps.WebAppUser) {
       .then((r) => r[0]);
   } else {
     // Обновляем username если он изменился или был добавлен
-    const newUsername = webAppUser.username && webAppUser.username.trim() !== "" 
-      ? webAppUser.username.trim() 
-      : null;
-    
     // Обновляем только если username изменился
-    if (user.username !== newUsername) {
-      console.error(`[telegram-auth] Updating username: telegramId=${telegramId}, old=${user.username}, new=${newUsername}`);
+    if (user.username !== username) {
+      console.error(`[telegram-auth] Updating username: telegramId=${telegramId}, old=${user.username}, new=${username}`);
       await db
         .update(users)
-        .set({ username: newUsername })
+        .set({ username })
         .where(eq(users.telegramId, telegramId));
       // Обновляем локальный объект user
       user = await db.query.users.findFirst({
