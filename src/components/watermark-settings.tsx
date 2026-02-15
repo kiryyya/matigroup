@@ -23,14 +23,22 @@ export default function WatermarkSettings() {
     },
   });
 
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<{
+    enabled: boolean;
+    text: string;
+    opacity: number;
+    fontSize: number;
+    color: { r: number; g: number; b: number };
+    angle: number;
+    position: 'center' | 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right' | 'repeat';
+  }>({
     enabled: true,
     text: 'Matigroup',
     opacity: 0.15,
     fontSize: 48,
     color: { r: 0, g: 0, b: 0 },
     angle: -45,
-    position: 'center' as const,
+    position: 'center',
   });
 
   useEffect(() => {
@@ -42,7 +50,7 @@ export default function WatermarkSettings() {
         fontSize: settings.fontSize ?? 48,
         color: settings.color ?? { r: 0, g: 0, b: 0 },
         angle: settings.angle ?? -45,
-        position: settings.position ?? 'center',
+        position: (settings.position as 'center' | 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right' | 'repeat') ?? 'center',
       });
     }
   }, [settings]);
@@ -271,7 +279,7 @@ export default function WatermarkSettings() {
                   onChange={(e) =>
                     setFormData({
                       ...formData,
-                      position: e.target.value as typeof formData.position,
+                      position: e.target.value as 'center' | 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right' | 'repeat',
                     })
                   }
                   className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
