@@ -46,7 +46,7 @@ export default function Settings() {
     <div className="space-y-6 pb-52">
       <h1 className="text-2xl font-bold">Настройки</h1>
 
-      <div className="space-y-4">
+      <div className="space-y-6">
         {settingsItems.map((item) => {
           const Icon = item.icon;
           return (
