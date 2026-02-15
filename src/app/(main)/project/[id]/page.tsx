@@ -621,7 +621,7 @@ export default function ProjectPage({ params }: ProjectPageProps) {
                     </div>
                     <Button
                       onClick={async () => {
-                        if (currentFile?.name) {
+                        if (currentFile?.name && displayProject.attachments) {
                           // Находим индекс файла в attachments и скачиваем его
                           const attachmentIndex = displayProject.attachments.findIndex(
                             (att) => att.originalName === currentFile.name
