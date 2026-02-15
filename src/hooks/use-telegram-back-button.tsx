@@ -19,7 +19,13 @@ export default function useTelegramBackButton() {
     }
 
     const tg = window.Telegram.WebApp;
-    const BackButton = tg.BackButton as { show: () => void; hide: () => void; onClick: (callback: () => void) => void; offClick: (callback: () => void) => void } | undefined;
+    // Используем any для обхода проблем с типизацией Telegram Web App API
+    const BackButton = (tg as any).BackButton as {
+      show: () => void;
+      hide: () => void;
+      onClick: (callback: () => void) => void;
+      offClick: (callback: () => void) => void;
+    } | undefined;
 
     if (!BackButton) {
       return;
