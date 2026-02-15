@@ -15,7 +15,7 @@ import { useModal } from "~/contexts/modal-context";
 export default function useTelegramBackButton() {
   const pathname = usePathname();
   const router = useRouter();
-  const { isModalOpen } = useModal();
+  const { isModalOpen, isFileModalOpen, setIsFileModalOpen } = useModal();
   
   // Используем ref для хранения обработчика, чтобы не пересоздавать его
   const handlerRef = useRef<(() => void) | null>(null);
@@ -45,6 +45,27 @@ export default function useTelegramBackButton() {
       // Используем синхронную проверку через window.location для более раннего определения
       // Это гарантирует, что мы получаем актуальный путь до того, как React обновит pathname
       const currentPath = typeof window !== "undefined" ? window.location.pathname : pathname;
+      
+      // Удаляем предыдущий обработчик, если он был
+      if (handlerRef.current) {
+        BackButton.offClick(handlerRef.current);
+        handlerRef.current = null;
+      }
+
+      // Если открыто модальное окно файла, BackButton должна закрывать его
+      if (isFileModalOpen) {
+        BackButton.show();
+        
+        const handleBack = () => {
+          setIsFileModalOpen(false);
+        };
+
+        handlerRef.current = handleBack;
+        BackButton.onClick(handleBack);
+        return;
+      }
+
+      // Обычная логика для навигации
       const shouldShow = currentPath !== "/" && !isModalOpen;
 
       // Если состояние не изменилось и не принудительное обновление, не делаем ничего
@@ -54,12 +75,6 @@ export default function useTelegramBackButton() {
 
       // Обновляем предыдущее состояние
       prevShouldShowRef.current = shouldShow;
-
-      // Удаляем предыдущий обработчик, если он был
-      if (handlerRef.current) {
-        BackButton.offClick(handlerRef.current);
-        handlerRef.current = null;
-      }
 
       if (shouldShow) {
         // Показываем системную кнопку "Назад" синхронно
@@ -79,7 +94,7 @@ export default function useTelegramBackButton() {
         BackButton.hide();
       }
     },
-    [pathname, isModalOpen, router],
+    [pathname, isModalOpen, isFileModalOpen, setIsFileModalOpen, router],
   );
 
   // Синхронное обновление через useLayoutEffect (выполняется до отрисовки)

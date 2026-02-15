@@ -9,10 +9,11 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, Calendar, User, Download, Eye, FileText, Image as ImageIcon, FileVideo, FileAudio, Archive, File, Trash2, X, Pencil, Copy, ChevronLeft, ChevronRight } from "lucide-react";
 import FavoriteButton from "~/components/favorite-button";
-import { useState, useEffect, useLayoutEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "~/components/ui/dialog";
 import EditProjectModal from "~/components/edit-project-modal";
 import { toast } from "sonner";
+import { useModal } from "~/contexts/modal-context";
 import type { StoredAttachment, StoredImage } from "~/types/files";
 
 interface ProjectPageProps {
@@ -23,6 +24,7 @@ interface ProjectPageProps {
 
 export default function ProjectPage({ params }: ProjectPageProps) {
   const { data: user } = api.tg.getUser.useQuery();
+  const { setIsFileModalOpen: setGlobalFileModalOpen } = useModal();
   
   // Состояния для модального окна файла
   const [isFileModalOpen, setIsFileModalOpen] = useState(false);
@@ -34,6 +36,19 @@ export default function ProjectPage({ params }: ProjectPageProps) {
     size?: number;
   } | null>(null);
   const [isEditOpen, setIsEditOpen] = useState(false);
+
+  // Синхронизируем локальное состояние с глобальным для BackButton
+  useEffect(() => {
+    setGlobalFileModalOpen(isFileModalOpen);
+  }, [isFileModalOpen, setGlobalFileModalOpen]);
+
+  // Синхронизируем глобальное состояние обратно в локальное (на случай закрытия через BackButton)
+  const { isFileModalOpen: globalFileModalOpen } = useModal();
+  useEffect(() => {
+    if (!globalFileModalOpen && isFileModalOpen) {
+      setIsFileModalOpen(false);
+    }
+  }, [globalFileModalOpen, isFileModalOpen]);
   
   // Состояние для карусели изображений
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
@@ -53,64 +68,6 @@ export default function ProjectPage({ params }: ProjectPageProps) {
     }
   }, [isFileModalOpen, currentFile?.url]);
 
-  // Обработка системной BackButton для модального окна файла
-  // Используем useEffect с requestAnimationFrame чтобы установить обработчик после основного хука
-  const backButtonHandlerRef = useRef<(() => void) | null>(null);
-  
-  useEffect(() => {
-    if (typeof window === "undefined" || !window.Telegram?.WebApp) {
-      return;
-    }
-
-    const tg = window.Telegram.WebApp;
-    const BackButton = (tg as any).BackButton as {
-      show: () => void;
-      hide: () => void;
-      onClick: (callback: () => void) => void;
-      offClick: (callback: () => void) => void;
-    } | undefined;
-
-    if (!BackButton) {
-      return;
-    }
-
-    if (isFileModalOpen) {
-      // Когда модальное окно файла открыто, BackButton должна закрывать его
-      // Удаляем предыдущий обработчик, если он был
-      if (backButtonHandlerRef.current) {
-        BackButton.offClick(backButtonHandlerRef.current);
-      }
-      
-      // Устанавливаем новый обработчик для закрытия модального окна
-      const handleBack = () => {
-        setIsFileModalOpen(false);
-      };
-
-      backButtonHandlerRef.current = handleBack;
-      BackButton.show();
-      
-      // Используем requestAnimationFrame чтобы установить обработчик после основного хука
-      // Это гарантирует, что наш обработчик будет последним и перезапишет основной
-      requestAnimationFrame(() => {
-        BackButton.onClick(handleBack);
-      });
-    } else {
-      // Когда модальное окно закрыто, удаляем наш обработчик
-      // Основной хук useTelegramBackButton восстановит свой обработчик
-      if (backButtonHandlerRef.current) {
-        BackButton.offClick(backButtonHandlerRef.current);
-        backButtonHandlerRef.current = null;
-      }
-    }
-
-    return () => {
-      // Очистка при размонтировании
-      if (backButtonHandlerRef.current) {
-        BackButton.offClick(backButtonHandlerRef.current);
-        backButtonHandlerRef.current = null;
-      }
-    };
-  }, [isFileModalOpen]);
   
   // Используем оптимизированный запрос для быстрой загрузки
   const { data: project, isLoading } = api.projects.project.useQuery({

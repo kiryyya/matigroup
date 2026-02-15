@@ -5,17 +5,22 @@ import React, { createContext, useContext, useState, type ReactNode } from "reac
 interface ModalContextType {
   isModalOpen: boolean;
   setIsModalOpen: (open: boolean) => void;
+  isFileModalOpen: boolean;
+  setIsFileModalOpen: (open: boolean) => void;
 }
 
 const ModalContext = createContext<ModalContextType | undefined>(undefined);
 
 export function ModalProvider({ children }: { children: ReactNode }) {
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isFileModalOpen, setIsFileModalOpen] = useState(false);
 
   return (
     <ModalContext.Provider value={{ 
       isModalOpen, 
-      setIsModalOpen
+      setIsModalOpen,
+      isFileModalOpen,
+      setIsFileModalOpen,
     }}>
       {children}
     </ModalContext.Provider>
