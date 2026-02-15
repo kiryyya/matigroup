@@ -417,11 +417,11 @@ async function addImageWatermark(
     }
   } else {
     // Если нет alpha канала, добавляем его
-    const newPixels = Buffer.alloc(pixels.length / channels * 4);
+    const newPixels = Buffer.alloc((pixels.length / channels) * 4);
     for (let i = 0; i < pixels.length; i += channels) {
-      const r = pixels[i];
-      const g = pixels[i + 1];
-      const b = pixels[i + 2];
+      const r = pixels[i] ?? 0;
+      const g = pixels[i + 1] ?? 0;
+      const b = pixels[i + 2] ?? 0;
       const a = Math.round(255 * options.opacity);
       
       const newIndex = (i / channels) * 4;
