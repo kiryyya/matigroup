@@ -6,12 +6,14 @@ export interface WatermarkOptions {
   text: string;
   opacity?: number;
   fontSize?: number;
+  fontSizePercent?: number; // Размер шрифта в процентах от минимальной стороны изображения
   color?: { r: number; g: number; b: number };
   angle?: number;
   // Новые опции для изображений
   position?: 'center' | 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right' | 'repeat';
   imageWatermark?: Buffer; // Изображение-водяной знак (логотип)
   enabled?: boolean; // Включен ли водяной знак
+  imageSizePercent?: number; // Размер изображения-водяного знака в процентах от минимальной стороны
 }
 
 const DEFAULT_WATERMARK_OPTIONS: WatermarkOptions = {
@@ -179,6 +181,7 @@ export async function addWatermarkToImage(
           opacity: watermarkOptions.opacity || 0.3,
           position: watermarkOptions.position || 'center',
           angle: watermarkOptions.angle || 0,
+          sizePercent: watermarkOptions.imageSizePercent || 20,
         });
       } catch (error) {
         console.error('Ошибка при применении изображения водяного знака, используем текстовый:', error);
@@ -190,7 +193,15 @@ export async function addWatermarkToImage(
     // Если нет текста, используем текст по умолчанию
     const watermarkText = watermarkOptions.text || 'Matigroup';
     
-    const fontSize = watermarkOptions.fontSize || Math.min(width, height) / 10;
+    // Вычисляем размер шрифта: либо из fontSize, либо из fontSizePercent, либо по умолчанию
+    let fontSize: number;
+    if (watermarkOptions.fontSize) {
+      fontSize = watermarkOptions.fontSize;
+    } else if (watermarkOptions.fontSizePercent) {
+      fontSize = Math.min(width, height) * (watermarkOptions.fontSizePercent / 100);
+    } else {
+      fontSize = Math.min(width, height) / 10;
+    }
     const svgText = createWatermarkSVG(
       watermarkText,
       fontSize,
@@ -348,7 +359,7 @@ function escapeXml(text: string): string {
 async function addImageWatermark(
   imageBuffer: Buffer,
   watermarkImage: Buffer,
-  options: { opacity: number; position: string; angle?: number }
+  options: { opacity: number; position: string; angle?: number; sizePercent?: number }
 ): Promise<Buffer> {
   const image = sharp(imageBuffer);
   const watermark = sharp(watermarkImage);
@@ -361,8 +372,9 @@ async function addImageWatermark(
   const watermarkWidth = watermarkMetadata.width || 0;
   const watermarkHeight = watermarkMetadata.height || 0;
   
-  // Масштабируем водяной знак (например, 20% от размера изображения)
-  const maxWatermarkSize = Math.min(imageWidth, imageHeight) * 0.2;
+  // Масштабируем водяной знак в процентах от минимальной стороны изображения
+  const sizePercent = options.sizePercent || 20;
+  const maxWatermarkSize = Math.min(imageWidth, imageHeight) * (sizePercent / 100);
   const scale = Math.min(
     maxWatermarkSize / watermarkWidth,
     maxWatermarkSize / watermarkHeight

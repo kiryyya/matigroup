@@ -10,6 +10,7 @@ const watermarkSettingsSchema = z.object({
   text: z.string().min(1).max(100).optional(),
   opacity: z.number().min(0).max(1).default(0.15),
   fontSize: z.number().min(10).max(200).default(48),
+  fontSizePercent: z.number().min(1).max(100).optional(), // Размер шрифта в процентах от размера изображения
   color: z.object({
     r: z.number().min(0).max(255).default(0),
     g: z.number().min(0).max(255).default(0),
@@ -19,6 +20,7 @@ const watermarkSettingsSchema = z.object({
   position: z.enum(['center', 'top-left', 'top-right', 'bottom-left', 'bottom-right', 'repeat']).default('center'),
   watermarkImageKey: z.string().optional(), // Ключ изображения водяного знака в storage
   useImage: z.boolean().default(false), // Использовать изображение вместо текста
+  imageSizePercent: z.number().min(1).max(100).default(20), // Размер изображения-водяного знака в процентах от минимальной стороны
 });
 
 export const settingsRouter = createTRPCRouter({
@@ -42,11 +44,13 @@ export const settingsRouter = createTRPCRouter({
         text: 'Matigroup',
         opacity: 0.15,
         fontSize: 48,
+        fontSizePercent: undefined,
         color: { r: 0, g: 0, b: 0 },
         angle: -45,
         position: 'center' as const,
         useImage: false,
         watermarkImageKey: undefined,
+        imageSizePercent: 20,
       };
     }
 
@@ -118,11 +122,13 @@ export const settingsRouter = createTRPCRouter({
             text: 'Matigroup',
             opacity: 0.15,
             fontSize: 48,
+            fontSizePercent: undefined,
             color: { r: 0, g: 0, b: 0 },
             angle: -45,
             position: 'center' as const,
             useImage: false,
             watermarkImageKey: undefined,
+            imageSizePercent: 20,
           };
 
       // Обновляем настройки с новым ключом изображения

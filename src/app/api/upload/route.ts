@@ -59,11 +59,13 @@ export async function POST(request: NextRequest) {
             text?: string;
             opacity?: number;
             fontSize?: number;
+            fontSizePercent?: number;
             color?: { r: number; g: number; b: number };
             angle?: number;
             position?: string;
             useImage?: boolean;
             watermarkImageKey?: string;
+            imageSizePercent?: number;
           };
 
           console.log('Watermark config:', {
@@ -109,11 +111,13 @@ export async function POST(request: NextRequest) {
               // Если используем изображение, текст не нужен, иначе используем текст
               text: useImageWatermark ? undefined : (watermarkConfig.text ?? 'Matigroup'),
               opacity: watermarkConfig.opacity ?? 0.15,
-              fontSize: watermarkConfig.fontSize ?? 48,
+              fontSize: watermarkConfig.fontSize,
+              fontSizePercent: watermarkConfig.fontSizePercent,
               color: watermarkConfig.color ?? { r: 0, g: 0, b: 0 },
               angle: watermarkConfig.angle ?? -45,
               position: (watermarkConfig.position as any) ?? 'center',
               imageWatermark: useImageWatermark ? watermarkImageBuffer : undefined,
+              imageSizePercent: watermarkConfig.imageSizePercent ?? 20,
             });
             body = new Uint8Array(watermarkedBuffer);
             console.log('Watermark applied successfully');

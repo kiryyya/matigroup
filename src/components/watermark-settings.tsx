@@ -39,20 +39,24 @@ export default function WatermarkSettings() {
     text: string;
     opacity: number;
     fontSize: number;
+    fontSizePercent?: number;
     color: { r: number; g: number; b: number };
     angle: number;
     position: 'center' | 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right' | 'repeat';
     useImage: boolean;
     watermarkImageKey?: string;
+    imageSizePercent: number;
   }>({
     enabled: true,
     text: 'Matigroup',
     opacity: 0.15,
     fontSize: 48,
+    fontSizePercent: undefined,
     color: { r: 0, g: 0, b: 0 },
     angle: -45,
     position: 'center',
     useImage: false,
+    imageSizePercent: 20,
   });
 
   const [watermarkImagePreview, setWatermarkImagePreview] = useState<string | null>(null);
@@ -64,11 +68,13 @@ export default function WatermarkSettings() {
         text: settings.text ?? 'Matigroup',
         opacity: settings.opacity ?? 0.15,
         fontSize: settings.fontSize ?? 48,
+        fontSizePercent: settings.fontSizePercent,
         color: settings.color ?? { r: 0, g: 0, b: 0 },
         angle: settings.angle ?? -45,
         position: (settings.position as 'center' | 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right' | 'repeat') ?? 'center',
         useImage: settings.useImage ?? false,
         watermarkImageKey: settings.watermarkImageKey,
+        imageSizePercent: settings.imageSizePercent ?? 20,
       });
       
       // Загружаем превью изображения водяного знака, если оно есть
@@ -93,11 +99,13 @@ export default function WatermarkSettings() {
         text: settings.text ?? 'Matigroup',
         opacity: settings.opacity ?? 0.15,
         fontSize: settings.fontSize ?? 48,
+        fontSizePercent: settings.fontSizePercent,
         color: settings.color ?? { r: 0, g: 0, b: 0 },
         angle: settings.angle ?? -45,
         position: settings.position ?? 'center',
         useImage: settings.useImage ?? false,
         watermarkImageKey: settings.watermarkImageKey,
+        imageSizePercent: settings.imageSizePercent ?? 20,
       });
     }
   };
@@ -274,6 +282,26 @@ export default function WatermarkSettings() {
                   <p className="text-sm text-muted-foreground">
                     Загрузите изображение для использования в качестве водяного знака. При замене старое изображение будет перезаписано.
                   </p>
+                  
+                  {/* Размер изображения-водяного знака */}
+                  <div className="space-y-2 mt-4">
+                    <Label htmlFor="imageSizePercent">Размер изображения: {formData.imageSizePercent}%</Label>
+                    <Input
+                      id="imageSizePercent"
+                      type="range"
+                      min="1"
+                      max="100"
+                      step="1"
+                      value={formData.imageSizePercent}
+                      onChange={(e) =>
+                        setFormData({ ...formData, imageSizePercent: parseInt(e.target.value) })
+                      }
+                      className="w-full"
+                    />
+                    <p className="text-sm text-muted-foreground">
+                      От 1% до 100% от минимальной стороны изображения
+                    </p>
+                  </div>
                 </div>
               ) : (
                 /* Текст водяного знака */
@@ -318,7 +346,7 @@ export default function WatermarkSettings() {
 
               {/* Размер шрифта */}
               <div className="space-y-2">
-                <Label htmlFor="fontSize">Размер шрифта: {formData.fontSize}px</Label>
+                <Label htmlFor="fontSize">Размер шрифта (пиксели): {formData.fontSize}px</Label>
                 <Input
                   id="fontSize"
                   type="range"
@@ -332,7 +360,28 @@ export default function WatermarkSettings() {
                   className="w-full"
                 />
                 <p className="text-sm text-muted-foreground">
-                  От 10 до 200 пикселей
+                  От 10 до 200 пикселей (фиксированный размер)
+                </p>
+              </div>
+
+              {/* Размер шрифта в процентах */}
+              <div className="space-y-2">
+                <Label htmlFor="fontSizePercent">Размер шрифта (проценты): {formData.fontSizePercent ?? 'Не задано'}%</Label>
+                <Input
+                  id="fontSizePercent"
+                  type="range"
+                  min="1"
+                  max="100"
+                  step="1"
+                  value={formData.fontSizePercent ?? 10}
+                  onChange={(e) => {
+                    const value = parseInt(e.target.value);
+                    setFormData({ ...formData, fontSizePercent: value });
+                  }}
+                  className="w-full"
+                />
+                <p className="text-sm text-muted-foreground">
+                  От 1% до 100% от минимальной стороны изображения (приоритет над пикселями, если задано)
                 </p>
               </div>
 
