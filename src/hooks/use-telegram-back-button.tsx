@@ -54,14 +54,18 @@ export default function useTelegramBackButton() {
 
       // Если открыто модальное окно файла, BackButton должна закрывать его
       if (isFileModalOpen) {
+        // Показываем BackButton для закрытия модального окна
         BackButton.show();
         
         const handleBack = () => {
+          console.log("BackButton clicked: closing file modal");
           setIsFileModalOpen(false);
         };
 
         handlerRef.current = handleBack;
         BackButton.onClick(handleBack);
+        // Сбрасываем prevShouldShowRef, чтобы при следующем обновлении логика работала правильно
+        prevShouldShowRef.current = null;
         return;
       }
 

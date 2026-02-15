@@ -9,7 +9,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, Calendar, User, Download, Eye, FileText, Image as ImageIcon, FileVideo, FileAudio, Archive, File, Trash2, X, Pencil, Copy, ChevronLeft, ChevronRight } from "lucide-react";
 import FavoriteButton from "~/components/favorite-button";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useLayoutEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "~/components/ui/dialog";
 import EditProjectModal from "~/components/edit-project-modal";
 import { toast } from "sonner";
@@ -38,14 +38,16 @@ export default function ProjectPage({ params }: ProjectPageProps) {
   const [isEditOpen, setIsEditOpen] = useState(false);
 
   // Синхронизируем локальное состояние с глобальным для BackButton
-  useEffect(() => {
+  // Используем useLayoutEffect для синхронного обновления
+  useLayoutEffect(() => {
     setGlobalFileModalOpen(isFileModalOpen);
   }, [isFileModalOpen, setGlobalFileModalOpen]);
 
   // Синхронизируем глобальное состояние обратно в локальное (на случай закрытия через BackButton)
   const { isFileModalOpen: globalFileModalOpen } = useModal();
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!globalFileModalOpen && isFileModalOpen) {
+      console.log("Global file modal closed, closing local modal");
       setIsFileModalOpen(false);
     }
   }, [globalFileModalOpen, isFileModalOpen]);
@@ -618,9 +620,16 @@ export default function ProjectPage({ params }: ProjectPageProps) {
                       </p>
                     </div>
                     <Button
-                      onClick={() => {
-                        if (currentFile?.url) {
-                          window.open(currentFile.url, "_blank");
+                      onClick={async () => {
+                        if (currentFile?.name) {
+                          // Находим индекс файла в attachments и скачиваем его
+                          const attachmentIndex = displayProject.attachments.findIndex(
+                            (att) => att.originalName === currentFile.name
+                          );
+                          if (attachmentIndex !== -1) {
+                            await downloadFile(displayProject.attachments[attachmentIndex]!, attachmentIndex);
+                            setIsFileModalOpen(false);
+                          }
                         }
                       }}
                       className="mt-4"
