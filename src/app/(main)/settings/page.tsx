@@ -2,20 +2,13 @@
 
 import { api } from "~/trpc/react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "~/components/ui/card";
-import { Badge } from "~/components/ui/badge";
-import { Button } from "~/components/ui/button";
 import Loader from "~/components/ui/loader";
-import { Plus, Search } from "lucide-react";
-import CreateProjectModal from "~/components/create-project-modal";
-import UserSearchModal from "~/components/user-search-modal";
-import WatermarkSettings from "~/components/watermark-settings";
-import { useModal } from "~/contexts/modal-context";
-import { useState, useEffect } from "react";
+import Link from "next/link";
+import { Search, Plus, Image as ImageIcon, ChevronRight } from "lucide-react";
+import { cn } from "~/lib/utils";
 
 export default function Settings() {
   const { data: user, isLoading } = api.tg.getUser.useQuery();
-  const { isModalOpen, setIsModalOpen } = useModal();
-  const [isUserSearchOpen, setIsUserSearchOpen] = useState(false);
 
   if (isLoading) {
     return (
@@ -25,65 +18,61 @@ export default function Settings() {
     );
   }
 
+  const settingsItems = [
+    {
+      title: "Поиск пользователей",
+      description: "Найдите пользователей по имени или email и управляйте их ролями",
+      href: "/settings/users",
+      icon: Search,
+      adminOnly: true,
+    },
+    {
+      title: "Управление проектами",
+      description: "Создавайте и управляйте проектами",
+      href: "/settings/projects",
+      icon: Plus,
+      adminOnly: true,
+    },
+    {
+      title: "Настройки водяного знака",
+      description: "Настройте параметры водяного знака для изображений",
+      href: "/settings/watermark",
+      icon: ImageIcon,
+      adminOnly: true,
+    },
+  ].filter(item => !item.adminOnly || user?.role === "admin");
+
   return (
     <div className="space-y-6 pb-52">
       <h1 className="text-2xl font-bold">Настройки</h1>
 
-      {/* Поиск пользователей */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Поиск пользователей</CardTitle>
-          <CardDescription>
-            Найдите пользователей по имени или email и посмотрите их роль
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Button 
-            onClick={() => setIsUserSearchOpen(true)}
-            className="w-full"
-            size="lg"
-            variant="outline"
-          >
-            <Search className="h-4 w-4 mr-2" />
-            Открыть поиск пользователей
-          </Button>
-        </CardContent>
-      </Card>
-
-      {/* Кнопка создания проекта */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Управление проектами</CardTitle>
-          <CardDescription>
-            Создавайте и управляйте проектами
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Button 
-            onClick={() => setIsModalOpen(true)}
-            className="w-full"
-            size="lg"
-          >
-            <Plus className="h-4 w-4 mr-2" />
-            Создать новый проект
-          </Button>
-        </CardContent>
-      </Card>
-
-      {/* Настройки водяного знака */}
-      {user?.role === "admin" && <WatermarkSettings />}
-
-      {/* Модальное окно создания проекта */}
-      <CreateProjectModal 
-        isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
-      />
-
-      {/* Модальное окно поиска пользователей */}
-      <UserSearchModal 
-        isOpen={isUserSearchOpen}
-        onClose={() => setIsUserSearchOpen(false)}
-      />
+      <div className="space-y-2">
+        {settingsItems.map((item) => {
+          const Icon = item.icon;
+          return (
+            <Link key={item.href} href={item.href}>
+              <Card className="cursor-pointer transition-all hover:shadow-md">
+                <CardContent className="p-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-4 flex-1">
+                      <div className="p-2 bg-muted rounded-lg">
+                        <Icon className="h-5 w-5 text-muted-foreground" />
+                      </div>
+                      <div className="flex-1">
+                        <h3 className="font-semibold text-lg">{item.title}</h3>
+                        <p className="text-sm text-muted-foreground">
+                          {item.description}
+                        </p>
+                      </div>
+                    </div>
+                    <ChevronRight className="h-5 w-5 text-muted-foreground" />
+                  </div>
+                </CardContent>
+              </Card>
+            </Link>
+          );
+        })}
+      </div>
     </div>
   );
 }
