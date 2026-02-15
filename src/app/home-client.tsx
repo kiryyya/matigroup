@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { useLayoutEffect, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
 import { Card, CardDescription, CardHeader, CardTitle } from "~/components/ui/card";
@@ -10,13 +10,18 @@ import DefaultLoader from "~/components/layouts/default-loader";
 
 export default function HomeClient() {
   const router = useRouter();
+  const pathname = usePathname();
   const searchParams = useSearchParams();
   const [isChecking, setIsChecking] = useState(true);
   
   useLayoutEffect(() => {
+    // Проверяем, был ли уже обработан deep link в этой сессии
+    const processedKey = 'deep_link_processed';
+    const processedParam = sessionStorage.getItem(processedKey);
+    
     // Проверяем параметры из разных источников
     const checkParams = () => {
-      // 1. Проверяем URL параметры
+      // 1. Проверяем URL параметры (только если их еще не обрабатывали)
       const urlParam = searchParams.get('start') || searchParams.get('startapp');
       
       // 2. Проверяем Telegram WebApp initData (доступно только на клиенте)
@@ -45,6 +50,12 @@ export default function HomeClient() {
       // Используем первый найденный параметр
       const startParam = urlParam || initDataParam || hashParam;
       
+      // Если параметр уже был обработан в этой сессии, пропускаем
+      if (processedParam === startParam) {
+        setIsChecking(false);
+        return;
+      }
+      
       if (!startParam) {
         setIsChecking(false);
         return;
@@ -66,23 +77,51 @@ export default function HomeClient() {
         type = startParam;
       }
 
-      // Редиректим на нужную страницу СРАЗУ
+      // Редиректим на нужную страницу СРАЗУ, только если мы еще не на нужной странице
       if (type === 'project' && id) {
+        // Если уже на странице этого проекта, не редиректим
+        if (pathname === `/project/${id}`) {
+          setIsChecking(false);
+          return;
+        }
+        // Сохраняем, что этот параметр уже обработан
+        sessionStorage.setItem(processedKey, startParam);
         router.replace(`/project/${id}`);
         return;
       }
       
       if (type === 'category' && id) {
+        // Если уже на странице этой категории, не редиректим
+        if (pathname === `/category/${id}`) {
+          setIsChecking(false);
+          return;
+        }
+        // Сохраняем, что этот параметр уже обработан
+        sessionStorage.setItem(processedKey, startParam);
         router.replace(`/category/${id}`);
         return;
       }
       
       if (type === 'settings' || type === 'profile') {
+        // Если уже на странице настроек, не редиректим
+        if (pathname === '/settings') {
+          setIsChecking(false);
+          return;
+        }
+        // Сохраняем, что этот параметр уже обработан
+        sessionStorage.setItem(processedKey, startParam);
         router.replace('/settings');
         return;
       }
 
       if (type === 'home' || type === 'main') {
+        // Если уже на главной, не редиректим
+        if (pathname === '/') {
+          setIsChecking(false);
+          return;
+        }
+        // Сохраняем, что этот параметр уже обработан
+        sessionStorage.setItem(processedKey, startParam);
         router.replace('/');
         return;
       }
@@ -97,7 +136,7 @@ export default function HomeClient() {
     }, 0);
     
     return () => clearTimeout(timer);
-  }, [searchParams, router]);
+  }, [searchParams, router, pathname]);
 
   // Пока проверяем параметры, показываем лоадер вместо контента
   if (isChecking) {

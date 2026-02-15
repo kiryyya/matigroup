@@ -1,10 +1,11 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 
 export default function useTelegramStartParam() {
   const router = useRouter();
+  const pathname = usePathname();
   const [hasProcessed, setHasProcessed] = useState(false);
   const [startParam, setStartParam] = useState<string | null>(null);
 
@@ -45,7 +46,13 @@ export default function useTelegramStartParam() {
     const startParamValue = getStartParam();
     setStartParam(startParamValue);
 
-    if (!startParamValue || hasProcessed) return;
+    // Проверяем, был ли уже обработан этот параметр в sessionStorage
+    const processedKey = 'deep_link_processed';
+    const processedParam = typeof window !== 'undefined' ? sessionStorage.getItem(processedKey) : null;
+    
+    if (!startParamValue || hasProcessed || processedParam === startParamValue) {
+      return;
+    }
 
     console.log('Обработка start_param:', startParamValue);
 
@@ -67,6 +74,48 @@ export default function useTelegramStartParam() {
     // Используем replace вместо push, чтобы не добавлять в историю
     // Небольшая задержка для корректной инициализации роутера
     const timer = setTimeout(() => {
+      // Проверяем, не находимся ли мы уже на нужной странице
+      let shouldRedirect = true;
+      
+      switch (type) {
+        case 'project':
+          if (id && pathname === `/project/${id}`) {
+            shouldRedirect = false;
+          }
+          break;
+
+        case 'category':
+          if (id && pathname === `/category/${id}`) {
+            shouldRedirect = false;
+          }
+          break;
+
+        case 'profile':
+        case 'settings':
+          if (pathname === '/settings') {
+            shouldRedirect = false;
+          }
+          break;
+
+        case 'home':
+        case 'main':
+          if (pathname === '/') {
+            shouldRedirect = false;
+          }
+          break;
+      }
+      
+      // Если уже на нужной странице, не редиректим
+      if (!shouldRedirect) {
+        setHasProcessed(true);
+        return;
+      }
+      
+      // Сохраняем, что этот параметр уже обработан
+      if (typeof window !== 'undefined') {
+        sessionStorage.setItem(processedKey, startParamValue);
+      }
+      
       switch (type) {
         case 'project':
           if (id) {
@@ -103,7 +152,7 @@ export default function useTelegramStartParam() {
     }, 300); // Уменьшена задержка, так как это только для initData
 
     return () => clearTimeout(timer);
-  }, [router, hasProcessed]);
+  }, [router, hasProcessed, pathname]);
 
   return {
     startParam,
