@@ -5,7 +5,6 @@ import Loader from "~/components/ui/loader";
 import CreateProjectModal from "~/components/create-project-modal";
 import { useModal } from "~/contexts/modal-context";
 import Link from "next/link";
-import { ArrowLeft } from "lucide-react";
 import { Button } from "~/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "~/components/ui/card";
 import { Plus } from "lucide-react";
@@ -29,7 +28,6 @@ export default function ProjectsSettingsPage() {
         <p className="text-muted-foreground">У вас нет прав для доступа к этой странице.</p>
         <Link href="/settings">
           <Button variant="outline">
-            <ArrowLeft className="h-4 w-4 mr-2" />
             Вернуться в настройки
           </Button>
         </Link>
@@ -39,18 +37,11 @@ export default function ProjectsSettingsPage() {
 
   return (
     <div className="space-y-6 pb-52">
-      <div className="flex items-center gap-4">
-        <Link href="/settings">
-          <Button variant="ghost" size="icon">
-            <ArrowLeft className="h-4 w-4" />
-          </Button>
-        </Link>
-        <div>
-          <h1 className="text-2xl font-bold">Управление проектами</h1>
-          <p className="text-muted-foreground">
-            Создавайте и управляйте проектами
-          </p>
-        </div>
+      <div>
+        <h1 className="text-2xl font-bold">Управление проектами</h1>
+        <p className="text-muted-foreground">
+          Создавайте и управляйте проектами
+        </p>
       </div>
 
       <Card>

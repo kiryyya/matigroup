@@ -46,13 +46,13 @@ export default function Settings() {
     <div className="space-y-6 pb-52">
       <h1 className="text-2xl font-bold">Настройки</h1>
 
-      <div className="space-y-2">
+      <div className="space-y-4">
         {settingsItems.map((item) => {
           const Icon = item.icon;
           return (
             <Link key={item.href} href={item.href}>
               <Card className="cursor-pointer transition-all hover:shadow-md">
-                <CardContent className="p-4">
+                <CardContent className="p-6">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-4 flex-1">
                       <div className="p-2 bg-muted rounded-lg">
