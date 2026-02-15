@@ -383,7 +383,12 @@ async function addImageWatermark(
   const scaledWidth = Math.round(watermarkWidth * scale);
   const scaledHeight = Math.round(watermarkHeight * scale);
   
-  // Применяем поворот и прозрачность
+  // Если прозрачность 0, возвращаем оригинальное изображение без водяного знака
+  if (options.opacity <= 0) {
+    return imageBuffer;
+  }
+  
+  // Применяем поворот
   let processedWatermark = watermark.resize(scaledWidth, scaledHeight);
   
   // Поворачиваем, если нужно
@@ -391,27 +396,95 @@ async function addImageWatermark(
     processedWatermark = processedWatermark.rotate(options.angle);
   }
   
-  // Применяем прозрачность через composite с полупрозрачным слоем
-  const watermarkProcessed = await processedWatermark
+  // Применяем прозрачность через умножение alpha канала
+  // Сначала получаем изображение с alpha каналом
+  const watermarkWithAlpha = await processedWatermark
     .ensureAlpha()
-    .toBuffer();
+    .raw()
+    .toBuffer({ resolveWithObject: true });
   
-  // Создаем маску прозрачности через SVG
-  const opacityMask = Buffer.from(
-    `<svg width="${scaledWidth}" height="${scaledHeight}">
-      <rect width="100%" height="100%" fill="white" opacity="${options.opacity}"/>
-    </svg>`
-  );
+  // Умножаем alpha канал на значение прозрачности
+  const pixels = watermarkWithAlpha.data;
+  const channels = watermarkWithAlpha.info.channels;
   
-  // Применяем прозрачность через composite
-  const watermarkWithOpacity = await sharp(watermarkProcessed)
-    .composite([
-      {
-        input: opacityMask,
-        blend: 'dest-in',
+  // Если есть alpha канал (4 канала: RGBA), умножаем его на opacity
+  if (channels === 4) {
+    for (let i = 3; i < pixels.length; i += 4) {
+      const currentAlpha = pixels[i];
+      if (currentAlpha !== undefined) {
+        pixels[i] = Math.round(currentAlpha * options.opacity);
+      }
+    }
+  } else {
+    // Если нет alpha канала, добавляем его
+    const newPixels = Buffer.alloc(pixels.length / channels * 4);
+    for (let i = 0; i < pixels.length; i += channels) {
+      const r = pixels[i];
+      const g = pixels[i + 1];
+      const b = pixels[i + 2];
+      const a = Math.round(255 * options.opacity);
+      
+      const newIndex = (i / channels) * 4;
+      newPixels[newIndex] = r;
+      newPixels[newIndex + 1] = g;
+      newPixels[newIndex + 2] = b;
+      newPixels[newIndex + 3] = a;
+    }
+    
+    const watermarkWithOpacity = sharp(newPixels, {
+      raw: {
+        width: scaledWidth,
+        height: scaledHeight,
+        channels: 4,
       },
-    ])
-    .toBuffer();
+    });
+    
+    // Вычисляем позицию
+    let left = 0;
+    let top = 0;
+    
+    switch (options.position) {
+      case 'top-left':
+        left = Math.round(imageWidth * 0.05);
+        top = Math.round(imageHeight * 0.05);
+        break;
+      case 'top-right':
+        left = Math.round(imageWidth - scaledWidth - imageWidth * 0.05);
+        top = Math.round(imageHeight * 0.05);
+        break;
+      case 'bottom-left':
+        left = Math.round(imageWidth * 0.05);
+        top = Math.round(imageHeight - scaledHeight - imageHeight * 0.05);
+        break;
+      case 'bottom-right':
+        left = Math.round(imageWidth - scaledWidth - imageWidth * 0.05);
+        top = Math.round(imageHeight - scaledHeight - imageHeight * 0.05);
+        break;
+      default: // center
+        left = Math.round((imageWidth - scaledWidth) / 2);
+        top = Math.round((imageHeight - scaledHeight) / 2);
+    }
+    
+    return image
+      .composite([
+        {
+          input: await watermarkWithOpacity.png().toBuffer(),
+          left,
+          top,
+          blend: 'over',
+        },
+      ])
+      .toBuffer();
+  }
+  
+  // Если уже есть alpha канал, создаем новое изображение с измененным alpha
+  const watermarkWithOpacity = sharp(pixels, {
+    raw: {
+      width: scaledWidth,
+      height: scaledHeight,
+      channels: 4,
+    },
+  });
   
   // Вычисляем позицию
   let left = 0;
