@@ -5,7 +5,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "~/com
 import { Badge } from "~/components/ui/badge";
 import Loader from "~/components/ui/loader";
 import { Heart, Calendar, User, MapPin } from "lucide-react";
-import Image from "next/image";
 import Link from "next/link";
 import { useState, useEffect } from "react";
 
@@ -129,11 +128,12 @@ export default function FavoritesPage() {
               {project.images && project.images.length > 0 && project.images[0] && (
                 <CardContent>
                   <div className="relative h-48 w-full rounded-lg overflow-hidden">
-                    <Image
-                      src={project.images[0]?.url ?? ""}
+                    <img
+                      src={project.images[0]?.previewUrl ?? project.images[0]?.url ?? ""}
                       alt={project.title}
-                      fill
-                      className="object-cover"
+                      className="h-full w-full object-cover"
+                      loading="lazy"
+                      decoding="async"
                       onError={(e) => {
                         const target = e.target as HTMLImageElement;
                         target.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAwIiBoZWlnaHQ9IjMwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjZjNmNGY2Ii8+PHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtZmFtaWx5PSJBcmlhbCIgZm9udC1zaXplPSIxNCIgZmlsbD0iIzY2NjY2NiIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZHk9Ii4zZW0iPkltYWdlPC90ZXh0Pjwvc3ZnPg==';

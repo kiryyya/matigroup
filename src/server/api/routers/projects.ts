@@ -401,7 +401,9 @@ export const projectsRouter = createTRPCRouter({
           const listImage = firstImage ? {
             ...firstImage,
             // В списке всегда используем previewUrl если есть, иначе url
+            // Сохраняем оба URL для совместимости с фронтендом
             url: firstImage.previewUrl ?? firstImage.url,
+            previewUrl: firstImage.previewUrl ?? firstImage.url,
           } : null;
           
           projectsData.push({
