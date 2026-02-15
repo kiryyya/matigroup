@@ -27,6 +27,11 @@ export default function FavoriteButton({ projectId, className = "" }: FavoriteBu
       await utils.projects.featured.refetch();
       // Инвалидируем все категории (без параметров инвалидирует все варианты)
       await utils.projects.projectsByCategory.invalidate();
+      // Инвалидируем данные проекта для обновления UI на странице проекта
+      await utils.projects.project.invalidate({ id: projectId });
+      await utils.projects.project.refetch({ id: projectId });
+      await utils.projects.projectFull.invalidate({ id: projectId });
+      await utils.projects.projectFull.refetch({ id: projectId });
     },
   });
   const removeFromFavorites = api.projects.removeFromFavorites.useMutation({
@@ -42,6 +47,11 @@ export default function FavoriteButton({ projectId, className = "" }: FavoriteBu
       await utils.projects.featured.refetch();
       // Инвалидируем все категории (без параметров инвалидирует все варианты)
       await utils.projects.projectsByCategory.invalidate();
+      // Инвалидируем данные проекта для обновления UI на странице проекта
+      await utils.projects.project.invalidate({ id: projectId });
+      await utils.projects.project.refetch({ id: projectId });
+      await utils.projects.projectFull.invalidate({ id: projectId });
+      await utils.projects.projectFull.refetch({ id: projectId });
     },
   });
 

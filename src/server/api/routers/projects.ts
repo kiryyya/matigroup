@@ -330,7 +330,15 @@ export const projectsRouter = createTRPCRouter({
           userId: ctx.user.id,
         }).returning();
         
-        return result[0];
+        // Получаем созданный проект с категорией
+        const createdProject = await db.query.projects.findFirst({
+          where: eq(projects.id, result[0]!.id),
+          with: {
+            category: true,
+          },
+        });
+        
+        return createdProject ?? result[0];
       } catch (error) {
         console.error("Error creating project:", error);
         if (error instanceof Error) {

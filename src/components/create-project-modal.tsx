@@ -53,7 +53,8 @@ export default function CreateProjectModal({ isOpen, onClose }: CreateProjectMod
       await utils.projects.allProjects.refetch();
       await utils.projects.favorites.invalidate();
       await utils.projects.favorites.refetch();
-      // Инвалидируем все категории (без параметров инвалидирует все варианты)
+      
+      // Инвалидируем все категории (без параметров инвалидирует все варианты, включая infinite queries)
       await utils.projects.projectsByCategory.invalidate();
     },
   });
