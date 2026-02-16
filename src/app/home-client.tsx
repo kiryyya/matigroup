@@ -8,7 +8,6 @@ import Image from "next/image";
 import { Card, CardDescription, CardHeader, CardTitle } from "~/components/ui/card";
 import DefaultLoader from "~/components/layouts/default-loader";
 import { api } from "~/trpc/react";
-import Loader from "~/components/ui/loader";
 
 export default function HomeClient() {
   const router = useRouter();
@@ -142,17 +141,8 @@ export default function HomeClient() {
   }, [searchParams, router, pathname]);
 
   // Пока проверяем параметры, показываем лоадер вместо контента
-  if (isChecking) {
+  if (isChecking || isLoadingCategories) {
     return <DefaultLoader />;
-  }
-
-  // Показываем лоадер, пока загружаются категории
-  if (isLoadingCategories) {
-    return (
-      <div className="flex h-full w-full items-center justify-center">
-        <Loader />
-      </div>
-    );
   }
 
   return (
@@ -164,39 +154,31 @@ export default function HomeClient() {
               {categories.map((category) => (
                 <Link key={category.id} href={`/category/${category.slug}`}>
                   <Card className="cursor-pointer transition-all hover:shadow-lg aspect-square flex flex-col relative overflow-hidden">
-                    {/* Фоновое изображение или цвет */}
                     <div className="absolute inset-0 z-0">
                       {category.backgroundImage ? (
-                        <>
-                          <Image
-                            src={category.backgroundImage}
-                            alt={category.name}
-                            fill
-                            className="object-cover"
-                            onError={(e) => {
-                              // Если изображение не загрузилось, показываем цветной фон
-                              const target = e.target as HTMLImageElement;
-                              target.style.display = 'none';
-                            }}
-                          />
-                          <div className="absolute inset-0 bg-black/40" />
-                        </>
+                        <div
+                          className="absolute inset-0 bg-cover bg-center"
+                          style={{ backgroundImage: `url(${category.backgroundImage})` }}
+                        />
                       ) : category.color ? (
                         <div
                           className="absolute inset-0"
                           style={{ backgroundColor: category.color }}
                         />
                       ) : (
-                        <div className="absolute inset-0 bg-gradient-to-br from-gray-800 to-gray-900" />
+                        <Image
+                          src="/benedict-canyon-whipple-russell-architecture-residential-houses-california-usa_dezeen_2364_hero.jpg"
+                          alt="Архитектурный фон"
+                          fill
+                          className="object-cover"
+                        />
                       )}
-                      {!category.backgroundImage && (
-                        <div className="absolute inset-0 bg-black/40" />
-                      )}
+                      <div className="absolute inset-0 bg-black/40" />
                     </div>
-                    
+
                     <CardHeader className="flex-1 flex flex-col justify-end items-start p-4 relative z-10">
                       <CardTitle className="flex items-center gap-2 text-lg text-white">
-                        {category.icon && <span>{category.icon}</span>}
+                        {category.icon ? `${category.icon} ` : ""}
                         {category.name}
                       </CardTitle>
                       {category.description && (
@@ -210,8 +192,8 @@ export default function HomeClient() {
               ))}
             </div>
           ) : (
-            <div className="text-center py-12 text-muted-foreground">
-              <p>Категории не найдены</p>
+            <div className="text-center text-muted-foreground py-10">
+              Категории пока не добавлены
             </div>
           )}
         </div>
