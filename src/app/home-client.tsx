@@ -7,12 +7,15 @@ import Link from "next/link";
 import Image from "next/image";
 import { Card, CardDescription, CardHeader, CardTitle } from "~/components/ui/card";
 import DefaultLoader from "~/components/layouts/default-loader";
+import { api } from "~/trpc/react";
+import Loader from "~/components/ui/loader";
 
 export default function HomeClient() {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const [isChecking, setIsChecking] = useState(true);
+  const { data: categories, isLoading: isLoadingCategories } = api.categories.getAll.useQuery();
   
   useLayoutEffect(() => {
     // Проверяем, был ли уже обработан deep link в этой сессии
@@ -143,111 +146,74 @@ export default function HomeClient() {
     return <DefaultLoader />;
   }
 
+  // Показываем лоадер, пока загружаются категории
+  if (isLoadingCategories) {
+    return (
+      <div className="flex h-full w-full items-center justify-center">
+        <Loader />
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen flex flex-col">
       <div className="flex-1 overflow-y-auto pb-52">
         <div className="max-w-4xl mx-auto px-4 py-6">
-          <div className="grid grid-cols-2 gap-4">
-            <Link href="/category/real-estate">
-              <Card className="cursor-pointer transition-all hover:shadow-lg aspect-square flex flex-col relative overflow-hidden">
-                {/* Фоновое изображение */}
-                <div className="absolute inset-0 z-0">
-                  <Image
-                    src="/benedict-canyon-whipple-russell-architecture-residential-houses-california-usa_dezeen_2364_hero.jpg"
-                    alt="Архитектурный фон"
-                    fill
-                    className="object-cover"
-                  />
-                  {/* Темный оверлей для лучшей читаемости текста */}
-                  <div className="absolute inset-0 bg-black/40" />
-                </div>
-                
-                <CardHeader className="flex-1 flex flex-col justify-end items-start p-4 relative z-10">
-                  <CardTitle className="flex items-center gap-2 text-lg text-white">
-                    Недвижимость
-                  </CardTitle>
-                  <CardDescription className="text-sm mt-1 text-white/90">
-                    Проекты недвижимости и архитектурные решения
-                  </CardDescription>
-                </CardHeader>
-              </Card>
-            </Link>
-
-            <Link href="/category/interiors">
-              <Card className="cursor-pointer transition-all hover:shadow-lg aspect-square flex flex-col relative overflow-hidden">
-                {/* Фоновое изображение */}
-                <div className="absolute inset-0 z-0">
-                  <Image
-                    src="/benedict-canyon-whipple-russell-architecture-residential-houses-california-usa_dezeen_2364_hero.jpg"
-                    alt="Архитектурный фон"
-                    fill
-                    className="object-cover"
-                  />
-                  {/* Темный оверлей для лучшей читаемости текста */}
-                  <div className="absolute inset-0 bg-black/40" />
-                </div>
-                
-                <CardHeader className="flex-1 flex flex-col justify-end items-start p-4 relative z-10">
-                  <CardTitle className="flex items-center gap-2 text-lg text-white">
-                    Интерьеры
-                  </CardTitle>
-                  <CardDescription className="text-sm mt-1 text-white/90">
-                    Дизайн интерьеров и декоративные решения
-                  </CardDescription>
-                </CardHeader>
-              </Card>
-            </Link>
-
-            <Link href="/category/facades">
-              <Card className="cursor-pointer transition-all hover:shadow-lg aspect-square flex flex-col relative overflow-hidden">
-                {/* Фоновое изображение */}
-                <div className="absolute inset-0 z-0">
-                  <Image
-                    src="/benedict-canyon-whipple-russell-architecture-residential-houses-california-usa_dezeen_2364_hero.jpg"
-                    alt="Архитектурный фон"
-                    fill
-                    className="object-cover"
-                  />
-                  {/* Темный оверлей для лучшей читаемости текста */}
-                  <div className="absolute inset-0 bg-black/40" />
-                </div>
-                
-                <CardHeader className="flex-1 flex flex-col justify-end items-start p-4 relative z-10">
-                  <CardTitle className="flex items-center gap-2 text-lg text-white">
-                    Фасады
-                  </CardTitle>
-                  <CardDescription className="text-sm mt-1 text-white/90">
-                    Фасадные решения и внешний дизайн зданий
-                  </CardDescription>
-                </CardHeader>
-              </Card>
-            </Link>
-
-            <Link href="/category/furniture">
-              <Card className="cursor-pointer transition-all hover:shadow-lg aspect-square flex flex-col relative overflow-hidden">
-                {/* Фоновое изображение */}
-                <div className="absolute inset-0 z-0">
-                  <Image
-                    src="/benedict-canyon-whipple-russell-architecture-residential-houses-california-usa_dezeen_2364_hero.jpg"
-                    alt="Архитектурный фон"
-                    fill
-                    className="object-cover"
-                  />
-                  {/* Темный оверлей для лучшей читаемости текста */}
-                  <div className="absolute inset-0 bg-black/40" />
-                </div>
-                
-                <CardHeader className="flex-1 flex flex-col justify-end items-start p-4 relative z-10">
-                  <CardTitle className="flex items-center gap-2 text-lg text-white">
-                    Мебель
-                  </CardTitle>
-                  <CardDescription className="text-sm mt-1 text-white/90">
-                    Мебельные решения и предметы интерьера
-                  </CardDescription>
-                </CardHeader>
-              </Card>
-            </Link>
-          </div>
+          {categories && categories.length > 0 ? (
+            <div className="grid grid-cols-2 gap-4">
+              {categories.map((category) => (
+                <Link key={category.id} href={`/category/${category.slug}`}>
+                  <Card className="cursor-pointer transition-all hover:shadow-lg aspect-square flex flex-col relative overflow-hidden">
+                    {/* Фоновое изображение или цвет */}
+                    <div className="absolute inset-0 z-0">
+                      {category.backgroundImage ? (
+                        <>
+                          <Image
+                            src={category.backgroundImage}
+                            alt={category.name}
+                            fill
+                            className="object-cover"
+                            onError={(e) => {
+                              // Если изображение не загрузилось, показываем цветной фон
+                              const target = e.target as HTMLImageElement;
+                              target.style.display = 'none';
+                            }}
+                          />
+                          <div className="absolute inset-0 bg-black/40" />
+                        </>
+                      ) : category.color ? (
+                        <div
+                          className="absolute inset-0"
+                          style={{ backgroundColor: category.color }}
+                        />
+                      ) : (
+                        <div className="absolute inset-0 bg-gradient-to-br from-gray-800 to-gray-900" />
+                      )}
+                      {!category.backgroundImage && (
+                        <div className="absolute inset-0 bg-black/40" />
+                      )}
+                    </div>
+                    
+                    <CardHeader className="flex-1 flex flex-col justify-end items-start p-4 relative z-10">
+                      <CardTitle className="flex items-center gap-2 text-lg text-white">
+                        {category.icon && <span>{category.icon}</span>}
+                        {category.name}
+                      </CardTitle>
+                      {category.description && (
+                        <CardDescription className="text-sm mt-1 text-white/90">
+                          {category.description}
+                        </CardDescription>
+                      )}
+                    </CardHeader>
+                  </Card>
+                </Link>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-12 text-muted-foreground">
+              <p>Категории не найдены</p>
+            </div>
+          )}
         </div>
       </div>
     </div>
