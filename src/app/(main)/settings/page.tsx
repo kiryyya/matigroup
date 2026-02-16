@@ -1,11 +1,10 @@
 "use client";
 
 import { api } from "~/trpc/react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "~/components/ui/card";
+import { Card, CardContent } from "~/components/ui/card";
 import Loader from "~/components/ui/loader";
 import Link from "next/link";
-import { Search, Plus, Image as ImageIcon, ChevronRight } from "lucide-react";
-import { cn } from "~/lib/utils";
+import { Search, Plus, Image as ImageIcon, ChevronRight, Folder } from "lucide-react";
 
 export default function Settings() {
   const { data: user, isLoading } = api.tg.getUser.useQuery();
@@ -31,6 +30,13 @@ export default function Settings() {
       description: "Создавайте и управляйте проектами",
       href: "/settings/projects",
       icon: Plus,
+      adminOnly: true,
+    },
+    {
+      title: "Управление категориями",
+      description: "Создавайте, редактируйте и удаляйте категории проектов",
+      href: "/settings/categories",
+      icon: Folder,
       adminOnly: true,
     },
     {

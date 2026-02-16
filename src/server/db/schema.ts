@@ -50,6 +50,7 @@ export const categories = createTable("categories", {
   description: text("description"),
   icon: varchar("icon", { length: 255 }),
   color: varchar("color", { length: 7 }), // hex color
+  backgroundImage: varchar("background_image", { length: 500 }), // URL или путь к фоновому изображению
   createdAt: timestamp("created_at", { withTimezone: true })
     .default(sql`CURRENT_TIMESTAMP`)
     .notNull(),

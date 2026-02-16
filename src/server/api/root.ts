@@ -3,6 +3,7 @@ import { createCallerFactory, createTRPCRouter } from "~/server/api/trpc";
 import { shopRouter } from "./routers/shop";
 import { projectsRouter } from "./routers/projects";
 import { settingsRouter } from "./routers/settings";
+import { categoriesRouter } from "./routers/categories";
 // tapRouter removed
 
 /**
@@ -15,6 +16,7 @@ export const appRouter = createTRPCRouter({
   shop: shopRouter,
   projects: projectsRouter,
   settings: settingsRouter,
+  categories: categoriesRouter,
 });
 
 // export type definition of API

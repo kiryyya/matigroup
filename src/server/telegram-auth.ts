@@ -126,7 +126,8 @@ async function checkOrCreateUser(webAppUser: TelegramWebApps.WebAppUser) {
 
   // Логируем весь объект webAppUser для отладки (используем console.error чтобы точно попало в логи)
   console.error('[telegram-auth] Full webAppUser object:', JSON.stringify(webAppUser, null, 2));
-  console.error('[telegram-auth] webAppUser.username:', webAppUser.username, 'type:', typeof webAppUser.username);
+  const webAppUsername = (webAppUser as any).username as string | undefined;
+  console.error('[telegram-auth] webAppUser.username:', webAppUsername, 'type:', typeof webAppUsername);
 
   const telegramId = webAppUser.id.toString();
 
@@ -135,8 +136,8 @@ async function checkOrCreateUser(webAppUser: TelegramWebApps.WebAppUser) {
   });
 
   // Нормализуем username из initData: если пустая строка, то null
-  let username = webAppUser.username && webAppUser.username.trim() !== "" 
-    ? webAppUser.username.trim() 
+  let username = webAppUsername && webAppUsername.trim() !== "" 
+    ? webAppUsername.trim() 
     : null;
 
   // Если username нет в initData, получаем его через Bot API
@@ -149,7 +150,7 @@ async function checkOrCreateUser(webAppUser: TelegramWebApps.WebAppUser) {
   }
 
   if (!user) {
-    console.error(`[telegram-auth] Creating user: telegramId=${telegramId}, username=${username}, webAppUser.username=${webAppUser.username}`);
+    console.error(`[telegram-auth] Creating user: telegramId=${telegramId}, username=${username}, webAppUser.username=${webAppUsername}`);
     
     user = await db
       .insert(users)

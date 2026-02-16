@@ -27,15 +27,12 @@ export const tgRouter = createTRPCRouter({
         ilike(users.email, `%${input.query}%`),
         eq(users.id, input.query),
         eq(users.telegramId, input.query),
-      ];
-
-      // Добавляем поиск по username только если поле не null
-      // Используем явную проверку через and
-      const usernameCondition = and(
-        isNotNull(users.username),
-        ilike(users.username, `%${input.query}%`)
-      );
-      searchConditions.push(usernameCondition);
+        // Добавляем поиск по username только если поле не null
+        and(
+          isNotNull(users.username),
+          ilike(users.username, `%${input.query}%`)
+        ),
+      ].filter((condition): condition is NonNullable<typeof condition> => condition !== undefined);
 
       const foundUsers = await db
         .select({
