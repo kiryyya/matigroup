@@ -183,9 +183,9 @@ export default function CreateProjectModal({ isOpen, onClose }: CreateProjectMod
                 // Проверяем размер preview файла
                 if (previewFile.size > 5 * 1024 * 1024) {
                   errors.push({ fileName: file.name, error: "Preview файл слишком большой после обработки" });
-                  continue;
-                }
-
+                continue;
+              }
+              
                 const [originalUpload, previewUpload] = await Promise.all([
                   uploadFile({ file, kind: "image", variant: "original" }),
                   uploadFile({ file: previewFile, kind: "image", variant: "preview" }),
@@ -220,7 +220,7 @@ export default function CreateProjectModal({ isOpen, onClose }: CreateProjectMod
             } else if (successCount > 0) {
               // Все успешно загружены
               console.log(`Успешно загружено ${successCount} изображений`);
-            }
+                  }
           } catch (error) {
             console.error("Критическая ошибка при обработке файлов:", error);
             alert("Произошла критическая ошибка при загрузке изображений");

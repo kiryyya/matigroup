@@ -124,30 +124,30 @@ export async function GET(
       const bodyBuffer = Buffer.from(await s3Object.Body.transformToByteArray());
       let finalBuffer: Buffer = bodyBuffer;
 
-      if (withWatermark) {
-        try {
+    if (withWatermark) {
+      try {
           const watermarked = await addWatermarkToFile(bodyBuffer, mimeType, {
             text: "123",
-            opacity: 0.5,
-            fontSize: 16,
-          });
+          opacity: 0.5,
+          fontSize: 16,
+        });
           finalBuffer = Buffer.isBuffer(watermarked) 
             ? watermarked 
             : Buffer.from(watermarked);
-        } catch (error) {
+      } catch (error) {
           console.error("Ошибка при добавлении водяного знака:", error);
           finalBuffer = bodyBuffer;
         }
-      }
-      
-      return new NextResponse(finalBuffer as BodyInit, {
-        status: 200,
-        headers: {
+    }
+    
+    return new NextResponse(finalBuffer as BodyInit, {
+      status: 200,
+      headers: {
           "Content-Type": mimeType,
           "Content-Disposition": `attachment; ${encodeFileName(fileName)}`,
           "Content-Length": finalBuffer.length.toString(),
-        },
-      });
+      },
+    });
     } catch (storageError) {
       console.error("Ошибка при получении файла из storage:", storageError);
       return NextResponse.json(
@@ -155,7 +155,7 @@ export async function GET(
         { status: 500 }
       );
     }
-
+    
   } catch (error) {
     console.error("Ошибка при скачивании файла:", error);
     const message = error instanceof Error ? error.message : "Internal server error";
