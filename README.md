@@ -11,6 +11,8 @@
 - Правила деплоя и пошаговый flow: `DEPLOYMENT.md`
 - Шаблон переменных версии образа: `deploy.env.example`
 - Шаблон production переменных окружения: `env.prod.example`
+- CI/CD workflow: `.github/workflows/build-and-deploy.yml`
+- Скрипты деплоя/rollback: `scripts/deploy.sh`, `scripts/rollback.sh`
 
 ## Стек
 

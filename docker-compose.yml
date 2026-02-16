@@ -19,12 +19,12 @@ services:
       PORT: 3000
       SKIP_ENV_VALIDATION: "true"
 
-    command: ["npm", "start"]
+    command: [ "npm", "start" ]
 
     # Basic app liveness check.
     # You can replace with /api/health once such endpoint is implemented.
     healthcheck:
-      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:3000 || exit 1"]
+      test: [ "CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:3000 || exit 1" ]
       interval: 15s
       timeout: 5s
       retries: 10
