@@ -6,6 +6,12 @@
 
 [Демо](https://t.me/yourbot/sample)
 
+## Деплой (production)
+
+- Правила деплоя и пошаговый flow: `DEPLOYMENT.md`
+- Шаблон переменных версии образа: `deploy.env.example`
+- Шаблон production переменных окружения: `env.prod.example`
+
 ## Стек
 
 - 🚀 next.js 14 (app router)

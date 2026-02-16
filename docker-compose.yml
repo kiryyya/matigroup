@@ -1,0 +1,31 @@
+services:
+  app:
+    # IMPORTANT:
+    # - Use ONLY versioned images
+    # - Never run production container via manual `docker run`
+    image: ${APP_IMAGE:?APP_IMAGE is required}:${APP_VERSION:?APP_VERSION is required}
+    container_name: matigroup-app
+    restart: unless-stopped
+
+    # Keep host mode to match current deployment behavior and Telegram webhook setup.
+    network_mode: host
+
+    # Secrets and runtime config should live only on the server.
+    env_file:
+      - .env.prod
+
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      SKIP_ENV_VALIDATION: "true"
+
+    command: ["npm", "start"]
+
+    # Basic app liveness check.
+    # You can replace with /api/health once such endpoint is implemented.
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:3000 || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
