@@ -23,7 +23,10 @@ ENV NODE_ENV=production
 # Build the application
 # Skip type checking and linting during Docker build
 ENV NEXT_TELEMETRY_DISABLED=1
-RUN npm run build 2>&1 | tee /tmp/build.log || (cat /tmp/build.log && exit 1)
+RUN npm run build
+
+# Verify build output exists
+RUN test -d .next || (echo "ERROR: .next directory not found after build!" && exit 1)
 
 # Expose port
 EXPOSE 3000
