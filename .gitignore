@@ -56,3 +56,11 @@ yarn-error.log*
 # idea files
 .idea
 .trigger
+
+# GitHub Secrets (never commit secrets!)
+GITHUB_SECRETS_*.txt
+GITHUB_SECRETS_*.md
+.github-secrets-*.txt
+.github-secrets-*.md
+*SECRETS*.txt
+*SECRETS*.md
