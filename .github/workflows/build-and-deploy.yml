@@ -58,8 +58,33 @@ jobs:
               DEPLOY_PATH="/opt/matigroup"
             fi
 
+            echo "=== Deployment Diagnostics ==="
+            echo "Deploy path: $DEPLOY_PATH"
+            echo "Image: ${{ needs.build-and-push.outputs.image_name }}"
+            echo "Version: ${{ needs.build-and-push.outputs.image_version }}"
+            
             cd "$DEPLOY_PATH"
             
-            chmod +x scripts/deploy.sh scripts/rollback.sh
-            ./scripts/deploy.sh "${{ needs.build-and-push.outputs.image_version }}" "${{ needs.build-and-push.outputs.image_name }}"
-            docker logs --tail 100 matigroup-app
+            echo "=== Checking required files ==="
+            ls -la || echo "Cannot list files"
+            [ -f docker-compose.yml ] && echo "✓ docker-compose.yml exists" || echo "✗ docker-compose.yml NOT FOUND"
+            [ -f .env.deploy ] && echo "✓ .env.deploy exists" || echo "✗ .env.deploy NOT FOUND"
+            [ -f .env.prod ] && echo "✓ .env.prod exists" || echo "✗ .env.prod NOT FOUND"
+            [ -f scripts/deploy.sh ] && echo "✓ scripts/deploy.sh exists" || echo "✗ scripts/deploy.sh NOT FOUND"
+            
+            echo "=== Current .env.deploy content ==="
+            cat .env.deploy || echo "Cannot read .env.deploy"
+            
+            echo "=== Docker status ==="
+            docker ps -a | grep matigroup || echo "No matigroup containers found"
+            
+            echo "=== Running deploy script ==="
+            chmod +x scripts/deploy.sh scripts/rollback.sh || true
+            ./scripts/deploy.sh "${{ needs.build-and-push.outputs.image_version }}" "${{ needs.build-and-push.outputs.image_name }}" || {
+              echo "=== Deploy failed, showing logs ==="
+              docker logs --tail 100 matigroup-app || echo "Cannot get logs"
+              exit 1
+            }
+            
+            echo "=== Deploy success, showing final logs ==="
+            docker logs --tail 100 matigroup-app || true
