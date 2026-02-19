@@ -2,13 +2,15 @@
  * Run `build` or `dev` with `SKIP_ENV_VALIDATION` to skip env validation. This is especially useful
  * for Docker builds.
  */
-let env;
-try {
-  env = await import("./src/env.js");
-} catch (error) {
-  // During Docker build, env might not be available
-  console.warn("Skipping env validation during build");
-  env = { env: {} };
+let env = { env: {} };
+if (process.env.SKIP_ENV_VALIDATION !== "true") {
+  try {
+    env = await import("./src/env.js");
+  } catch (error) {
+    // During Docker build, env might not be available
+    console.warn("Skipping env validation during build:", error.message);
+    env = { env: {} };
+  }
 }
 
 /** @type {import("next").NextConfig} */
