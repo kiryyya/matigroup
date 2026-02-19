@@ -61,7 +61,10 @@ jobs:
             cd "$DEPLOY_PATH"
             
             # Login to GHCR to pull private images
-            echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin || true
+            # Use GITHUB_TOKEN if available, otherwise try to use existing credentials
+            if [ -n "${{ secrets.GITHUB_TOKEN }}" ]; then
+              echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin || true
+            fi
             
             chmod +x scripts/deploy.sh scripts/rollback.sh
             ./scripts/deploy.sh "${{ needs.build-and-push.outputs.image_version }}" "${{ needs.build-and-push.outputs.image_name }}"
