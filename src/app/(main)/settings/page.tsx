@@ -57,7 +57,7 @@ export default function Settings() {
           const Icon = item.icon;
           return (
             <Link key={item.href} href={item.href}>
-              <Card className="cursor-pointer transition-all hover:shadow-md mb-6">
+              <Card className="cursor-pointer transition-all hover:shadow-md mb-16">
                 <CardContent className="p-6">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-4 flex-1">
