@@ -60,6 +60,9 @@ jobs:
 
             cd "$DEPLOY_PATH"
             
+            # Clean up Docker to free space before deploy
+            docker system prune -f --volumes || true
+            
             # Login to GHCR to pull private images
             echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
             
