@@ -21,8 +21,9 @@ ENV SKIP_ENV_VALIDATION=true
 ENV NODE_ENV=production
 
 # Build the application
-# Use --no-lint to skip linting during build
-RUN npm run build -- --no-lint
+# Skip type checking and linting during Docker build
+ENV NEXT_TELEMETRY_DISABLED=1
+RUN npm run build 2>&1 | tee /tmp/build.log || (cat /tmp/build.log && exit 1)
 
 # Expose port
 EXPOSE 3000

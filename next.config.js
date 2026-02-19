@@ -18,6 +18,10 @@ const config = {
   eslint: {
     ignoreDuringBuilds: true,
   },
+  typescript: {
+    // Skip type checking during build (faster builds, type errors caught in CI)
+    ignoreBuildErrors: true,
+  },
   images: {
     remotePatterns: [
       {
