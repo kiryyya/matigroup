@@ -65,14 +65,6 @@ set_kv "APP_VERSION" "$APP_VERSION" "$ENV_DEPLOY_FILE"
 
 echo "Pulling and starting new version..."
 docker compose --env-file "$ENV_DEPLOY_FILE" pull app
-
-# Stop and remove old container if it exists
-if docker ps -a --format '{{.Names}}' | grep -q "^${CONTAINER_NAME}$"; then
-  echo "Stopping old container..."
-  docker stop "$CONTAINER_NAME" 2>/dev/null || true
-  docker rm "$CONTAINER_NAME" 2>/dev/null || true
-fi
-
 docker compose --env-file "$ENV_DEPLOY_FILE" up -d app
 
 echo "Waiting for healthcheck..."

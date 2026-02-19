@@ -22,6 +22,10 @@ const config = {
     // Skip type checking during build (faster builds, type errors caught in CI)
     ignoreBuildErrors: true,
   },
+  // Skip static optimization for API routes during build
+  experimental: {
+    dynamicIO: true,
+  },
   images: {
     remotePatterns: [
       {

@@ -3,14 +3,21 @@ import { getPublicObject } from "~/lib/storage";
 
 // Force dynamic rendering - don't execute during build
 export const dynamic = 'force-dynamic';
+export const runtime = 'nodejs';
+export const revalidate = 0;
+
+// Prevent static generation
+export const dynamicParams = true;
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { path: string[] } }
+  { params }: { params: Promise<{ path: string[] }> | { path: string[] } }
 ) {
   try {
+    // Await params if it's a Promise (Next.js 15+)
+    const resolvedParams = params instanceof Promise ? await params : params;
     // Восстанавливаем путь к файлу из массива
-    const key = params.path.join('/');
+    const key = resolvedParams.path.join('/');
     
     if (!key) {
       return NextResponse.json({ error: "Key is required" }, { status: 400 });
