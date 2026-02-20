@@ -58,14 +58,16 @@ jobs:
               DEPLOY_PATH="/opt/matigroup"
             fi
 
-            # Authenticate to GHCR if token is provided
+            # Try to authenticate to GHCR if token is provided
+            # For public packages, this might not be needed, but it doesn't hurt
             if [ -n "${{ secrets.GHCR_TOKEN }}" ]; then
-              echo "Authenticating to GHCR..."
-              echo "${{ secrets.GHCR_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin || {
-                echo "Warning: GHCR authentication failed, trying without auth (package might be public)"
-              }
+              echo "Authenticating to GHCR with token..."
+              echo "${{ secrets.GHCR_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
             else
-              echo "No GHCR_TOKEN secret found. Assuming package is public or already authenticated."
+              echo "No GHCR_TOKEN found. If package is public, pull should work without auth."
+              echo "If you get 'denied' error, either:"
+              echo "  1. Make package public: https://github.com/kiryyya?tab=packages → matigroup → Package settings → Change visibility"
+              echo "  2. Add GHCR_TOKEN secret with Personal Access Token (read:packages scope)"
             fi
 
             cd "$DEPLOY_PATH"
