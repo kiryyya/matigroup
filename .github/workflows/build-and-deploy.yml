@@ -58,6 +58,16 @@ jobs:
               DEPLOY_PATH="/opt/matigroup"
             fi
 
+            # Authenticate to GHCR if token is provided
+            if [ -n "${{ secrets.GHCR_TOKEN }}" ]; then
+              echo "Authenticating to GHCR..."
+              echo "${{ secrets.GHCR_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin || {
+                echo "Warning: GHCR authentication failed, trying without auth (package might be public)"
+              }
+            else
+              echo "No GHCR_TOKEN secret found. Assuming package is public or already authenticated."
+            fi
+
             cd "$DEPLOY_PATH"
             
             chmod +x scripts/deploy.sh scripts/rollback.sh
