@@ -7,11 +7,7 @@ import Link from "next/link";
 import { Search, Plus, Image as ImageIcon, ChevronRight, Folder } from "lucide-react";
 
 export default function Settings() {
-  const { data: user, isLoading } = api.tg.getUser.useQuery(undefined, {
-    staleTime: 0, // Не кэшировать, всегда запрашивать свежие данные
-    refetchOnMount: true,
-    refetchOnWindowFocus: true,
-  });
+  const { data: user, isLoading } = api.tg.getUser.useQuery();
 
   if (isLoading) {
     return (

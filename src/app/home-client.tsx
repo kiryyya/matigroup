@@ -195,6 +195,7 @@ export default function HomeClient() {
           ) : (
             <div className="text-center text-muted-foreground py-10 space-y-2">
               <div>Категории пока не добавлены</div>
+              <div>Категории пока не добавлены</div>
               {user && (
                 <div className="text-sm mt-4 p-4 bg-muted rounded-lg">
                   <div className="font-semibold">Информация о пользователе:</div>
