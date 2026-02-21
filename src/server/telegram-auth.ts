@@ -75,53 +75,86 @@ export async function requireTelegramAdmin(headers: Headers) {
 async function isHashValid(data: Record<string, string>, botToken: string) {
   const encoder = new TextEncoder();
 
-  const checkString = Object.keys(data)
+  // Детальное логирование для диагностики
+  console.error('[telegram-auth] isHashValid: Starting validation');
+  console.error('[telegram-auth] isHashValid: Data keys:', Object.keys(data).join(', '));
+  console.error('[telegram-auth] isHashValid: BotToken length:', botToken.length);
+  console.error('[telegram-auth] isHashValid: BotToken (first 15):', botToken.substring(0, 15) + '...');
+
+  // Формируем checkString согласно документации Telegram
+  // Исключаем hash и signature, сортируем ключи, объединяем через \n
+  const keysToCheck = Object.keys(data)
     .filter((key) => key !== "hash" && key !== "signature")
+    .sort();
+  
+  console.error('[telegram-auth] isHashValid: Keys to check (sorted):', keysToCheck.join(', '));
+  
+  const checkString = keysToCheck
     .map((key) => `${key}=${data[key]}`)
-    .sort()
     .join("\n");
 
   console.error('[telegram-auth] isHashValid: checkString length:', checkString.length);
-  console.error('[telegram-auth] isHashValid: botToken length:', botToken.length);
-  console.error('[telegram-auth] isHashValid: data.hash:', data.hash?.substring(0, 20) + '...');
+  console.error('[telegram-auth] isHashValid: checkString (first 200 chars):', checkString.substring(0, 200));
+  console.error('[telegram-auth] isHashValid: checkString (escaped newlines):', checkString.replace(/\n/g, '\\n').substring(0, 200));
 
+  // Шаг 1: Создаем секретный ключ для "WebAppData"
   const secretKey = await webcrypto.subtle.importKey(
     "raw",
     encoder.encode("WebAppData"),
     { name: "HMAC", hash: "SHA-256" },
-    true,
+    false,
     ["sign"],
   );
 
+  // Шаг 2: Вычисляем промежуточный ключ (HMAC от botToken)
   const secret = await webcrypto.subtle.sign(
     "HMAC",
     secretKey,
     encoder.encode(botToken),
   );
 
+  console.error('[telegram-auth] isHashValid: Secret length:', secret.byteLength);
+
+  // Шаг 3: Создаем ключ для финальной подписи
   const signatureKey = await webcrypto.subtle.importKey(
     "raw",
     secret,
     { name: "HMAC", hash: "SHA-256" },
-    true,
+    false,
     ["sign"],
   );
 
+  // Шаг 4: Вычисляем финальную подпись
   const signature = await webcrypto.subtle.sign(
     "HMAC",
     signatureKey,
     encoder.encode(checkString),
   );
 
-  const hex = Buffer.from(signature).toString("hex");
-  console.error('[telegram-auth] isHashValid: calculated hash:', hex.substring(0, 20) + '...');
-  console.error('[telegram-auth] isHashValid: provided hash:', data.hash?.substring(0, 20) + '...');
-  console.error('[telegram-auth] isHashValid: provided signature:', data.signature?.substring(0, 20) + '...');
+  // Конвертируем в hex
+  const hex = Array.from(new Uint8Array(signature))
+    .map(b => b.toString(16).padStart(2, "0"))
+    .join("");
+
+  console.error('[telegram-auth] isHashValid: Calculated hash (full):', hex);
+  console.error('[telegram-auth] isHashValid: Provided hash:', data.hash || '(missing)');
+  console.error('[telegram-auth] isHashValid: Provided signature:', data.signature || '(missing)');
   
-  // Telegram WebApp может использовать либо hash, либо signature
-  const providedHash = data.hash || data.signature;
-  const match = providedHash === hex;
-  console.error('[telegram-auth] isHashValid: match:', match);
+  // Проверяем оба поля (hash и signature) для совместимости
+  const hashMatch = data.hash ? data.hash === hex : false;
+  const signatureMatch = data.signature ? data.signature === hex : false;
+  const match = hashMatch || signatureMatch;
+  
+  console.error('[telegram-auth] isHashValid: Hash match:', hashMatch);
+  console.error('[telegram-auth] isHashValid: Signature match:', signatureMatch);
+  console.error('[telegram-auth] isHashValid: Final match:', match);
+  
+  if (!match) {
+    console.error('[telegram-auth] isHashValid: VALIDATION FAILED');
+    console.error('[telegram-auth] isHashValid: Calculated:', hex);
+    console.error('[telegram-auth] isHashValid: Provided hash:', data.hash);
+    console.error('[telegram-auth] isHashValid: Provided signature:', data.signature);
+  }
   
   return match;
 }
