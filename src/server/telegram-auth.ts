@@ -17,6 +17,12 @@ export async function getTelegramUserFromHeaders(headers: Headers) {
 
   const data = Object.fromEntries(new URLSearchParams(initData));
   console.error('[telegram-auth] getTelegramUserFromHeaders: parsed data keys:', Object.keys(data).join(', '));
+  
+  if (!env.TELEGRAM_BOT_TOKEN) {
+    console.error('[telegram-auth] getTelegramUserFromHeaders: TELEGRAM_BOT_TOKEN is missing!');
+    return null;
+  }
+  
   const isValid = await isHashValid(data, env.TELEGRAM_BOT_TOKEN);
   console.error('[telegram-auth] getTelegramUserFromHeaders: hash valid:', isValid);
   if (!isValid) {
@@ -110,9 +116,14 @@ async function isHashValid(data: Record<string, string>, botToken: string) {
   const hex = Buffer.from(signature).toString("hex");
   console.error('[telegram-auth] isHashValid: calculated hash:', hex.substring(0, 20) + '...');
   console.error('[telegram-auth] isHashValid: provided hash:', data.hash?.substring(0, 20) + '...');
-  console.error('[telegram-auth] isHashValid: match:', data.hash === hex);
+  console.error('[telegram-auth] isHashValid: provided signature:', data.signature?.substring(0, 20) + '...');
   
-  return data.hash === hex;
+  // Telegram WebApp может использовать либо hash, либо signature
+  const providedHash = data.hash || data.signature;
+  const match = providedHash === hex;
+  console.error('[telegram-auth] isHashValid: match:', match);
+  
+  return match;
 }
 
 /**
