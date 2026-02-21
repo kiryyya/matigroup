@@ -15,15 +15,30 @@ export async function getTelegramUserFromHeaders(headers: Headers) {
     return null;
   }
 
-  const data = Object.fromEntries(new URLSearchParams(initData));
+  // Парсим initData, но сохраняем оригинальные URL-encoded значения для валидации
+  const urlParams = new URLSearchParams(initData);
+  const data: Record<string, string> = {};
+  const originalValues: Record<string, string> = {};
+  
+  // Сохраняем и декодированные, и оригинальные значения
+  for (const [key, value] of urlParams.entries()) {
+    data[key] = value; // Декодированное значение (для использования)
+    // Для hash валидации нужно использовать оригинальные URL-encoded значения
+    // Но URLSearchParams уже декодирует, поэтому нужно получить оригинальные из строки
+    const match = initData.match(new RegExp(`${key}=([^&]*)`));
+    originalValues[key] = match ? match[1] ?? value : value;
+  }
+  
   console.error('[telegram-auth] getTelegramUserFromHeaders: parsed data keys:', Object.keys(data).join(', '));
+  console.error('[telegram-auth] getTelegramUserFromHeaders: initData raw (first 200):', initData.substring(0, 200));
   
   if (!env.TELEGRAM_BOT_TOKEN) {
     console.error('[telegram-auth] getTelegramUserFromHeaders: TELEGRAM_BOT_TOKEN is missing!');
     return null;
   }
   
-  const isValid = await isHashValid(data, env.TELEGRAM_BOT_TOKEN);
+  // Пробуем валидацию с оригинальными URL-encoded значениями
+  const isValid = await isHashValid(data, originalValues, env.TELEGRAM_BOT_TOKEN);
   console.error('[telegram-auth] getTelegramUserFromHeaders: hash valid:', isValid);
   if (!isValid) {
     console.error('[telegram-auth] getTelegramUserFromHeaders: hash validation failed');
@@ -72,7 +87,7 @@ export async function requireTelegramAdmin(headers: Headers) {
   return user;
 }
 
-async function isHashValid(data: Record<string, string>, botToken: string) {
+async function isHashValid(data: Record<string, string>, originalValues: Record<string, string>, botToken: string) {
   const encoder = new TextEncoder();
 
   // Детальное логирование для диагностики
@@ -89,8 +104,14 @@ async function isHashValid(data: Record<string, string>, botToken: string) {
   
   console.error('[telegram-auth] isHashValid: Keys to check (sorted):', keysToCheck.join(', '));
   
+  // Пробуем использовать оригинальные URL-encoded значения
+  // Если их нет, используем декодированные
   const checkString = keysToCheck
-    .map((key) => `${key}=${data[key]}`)
+    .map((key) => {
+      const value = originalValues[key] ?? data[key];
+      console.error(`[telegram-auth] isHashValid: Key ${key}: decoded="${data[key]?.substring(0, 50)}", original="${originalValues[key]?.substring(0, 50)}"`);
+      return `${key}=${value}`;
+    })
     .join("\n");
 
   console.error('[telegram-auth] isHashValid: checkString length:', checkString.length);
