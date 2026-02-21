@@ -140,9 +140,29 @@ async function isHashValid(data: Record<string, string>, botToken: string) {
   console.error('[telegram-auth] isHashValid: Provided hash:', data.hash || '(missing)');
   console.error('[telegram-auth] isHashValid: Provided signature:', data.signature || '(missing)');
   
-  // Проверяем оба поля (hash и signature) для совместимости
+  // Проверяем hash (он должен быть в hex)
   const hashMatch = data.hash ? data.hash === hex : false;
-  const signatureMatch = data.signature ? data.signature === hex : false;
+  
+  // Проверяем signature (он может быть в base64, нужно декодировать)
+  let signatureMatch = false;
+  if (data.signature) {
+    try {
+      // Пробуем декодировать base64
+      const signatureBytes = Buffer.from(data.signature, 'base64');
+      const signatureHex = Array.from(new Uint8Array(signatureBytes))
+        .map(b => b.toString(16).padStart(2, "0"))
+        .join("");
+      signatureMatch = signatureHex === hex;
+      console.error('[telegram-auth] isHashValid: Signature (decoded from base64):', signatureHex);
+      console.error('[telegram-auth] isHashValid: Signature match (base64 decoded):', signatureMatch);
+    } catch (e) {
+      // Если не base64, пробуем как hex
+      signatureMatch = data.signature === hex;
+      console.error('[telegram-auth] isHashValid: Signature (as hex):', data.signature);
+      console.error('[telegram-auth] isHashValid: Signature match (as hex):', signatureMatch);
+    }
+  }
+  
   const match = hashMatch || signatureMatch;
   
   console.error('[telegram-auth] isHashValid: Hash match:', hashMatch);
