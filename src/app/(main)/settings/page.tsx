@@ -17,6 +17,11 @@ export default function Settings() {
     );
   }
 
+  // Отладка: логируем данные пользователя
+  console.log("Settings page - user data:", user);
+  console.log("Settings page - user role:", user?.role);
+  console.log("Settings page - is admin?", user?.role === "admin");
+
   const settingsItems = [
     {
       title: "Поиск пользователей",
@@ -52,8 +57,26 @@ export default function Settings() {
     <div className="space-y-6 pb-52">
       <h1 className="text-2xl font-bold">Настройки</h1>
 
+      {/* Временная отладочная информация */}
+      {process.env.NODE_ENV === "development" && (
+        <div className="p-4 bg-muted rounded-lg text-sm">
+          <p>User ID: {user?.id}</p>
+          <p>User Role: {user?.role || "не определено"}</p>
+          <p>Telegram ID: {user?.telegramId}</p>
+          <p>Is Admin: {user?.role === "admin" ? "Да" : "Нет"}</p>
+          <p>Filtered items count: {settingsItems.length}</p>
+        </div>
+      )}
+
       <div className="">
-        {settingsItems.map((item) => {
+        {settingsItems.length === 0 ? (
+          <div className="p-4 bg-muted rounded-lg">
+            <p className="text-muted-foreground">
+              Нет доступных настроек. Ваша роль: {user?.role || "не определена"}
+            </p>
+          </div>
+        ) : (
+          settingsItems.map((item) => {
           const Icon = item.icon;
           return (
             <Link key={item.href} href={item.href}>
@@ -77,7 +100,7 @@ export default function Settings() {
               </Card>
             </Link>
           );
-        })}
+        }))}
       </div>
     </div>
   );
