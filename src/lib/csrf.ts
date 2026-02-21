@@ -115,14 +115,24 @@ export function validateCSRF(request: NextRequest): boolean {
  */
 export function validateCSRFForTRPC(headers: Headers): void {
   const method = headers.get("x-http-method-override") || "POST";
+  const initData = headers.get("x-telegram-init-data");
   
   // GET запросы не требуют CSRF защиты
   if (method === "GET" || method === "HEAD") {
     return;
   }
 
+  // Если есть Telegram initData, это достаточная защита для Telegram WebApp
+  // initData подписывается ботом и не может быть подделан
+  if (initData) {
+    console.error('[CSRF] Telegram initData present, skipping CSRF check');
+    return;
+  }
+
   const origin = headers.get("origin");
   const referer = headers.get("referer");
+  
+  console.error(`[CSRF] Checking: method=${method}, origin=${origin}, referer=${referer}, initData=${!!initData}`);
   
   // Проверяем Origin
   if (origin) {
@@ -137,6 +147,7 @@ export function validateCSRFForTRPC(headers: Headers): void {
     });
     
     if (!isAllowed) {
+      console.error(`[CSRF] Invalid Origin: ${origin}, allowed: ${ALLOWED_ORIGINS.join(', ')}`);
       throw new TRPCError({
         code: "FORBIDDEN",
         message: "CSRF: Invalid Origin header",
@@ -158,6 +169,7 @@ export function validateCSRFForTRPC(headers: Headers): void {
       });
       
       if (!isAllowed) {
+        console.error(`[CSRF] Invalid Referer: ${referer}, allowed: ${ALLOWED_ORIGINS.join(', ')}`);
         throw new TRPCError({
           code: "FORBIDDEN",
           message: "CSRF: Invalid Referer header",
@@ -169,5 +181,11 @@ export function validateCSRFForTRPC(headers: Headers): void {
         message: "CSRF: Invalid Referer header format",
       });
     }
+  }
+  
+  // Если нет ни Origin, ни Referer, но есть initData - разрешаем
+  // Если нет ни того, ни другого - это может быть проблема, но для Telegram WebApp это нормально
+  if (!origin && !referer) {
+    console.error('[CSRF] No Origin or Referer, but allowing for Telegram WebApp');
   }
 }
