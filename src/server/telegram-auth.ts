@@ -180,5 +180,6 @@ async function checkOrCreateUser(webAppUser: TelegramWebApps.WebAppUser) {
   }
 
   console.error(`[telegram-auth] Returning user: telegramId=${user.telegramId}, role=${user.role}, id=${user.id}`);
+  console.log(`[telegram-auth] Returning user: telegramId=${user.telegramId}, role=${user.role}, id=${user.id}`);
   return user;
 }
