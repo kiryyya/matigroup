@@ -15,6 +15,7 @@ export default function HomeClient() {
   const searchParams = useSearchParams();
   const [isChecking, setIsChecking] = useState(true);
   const { data: categories, isLoading: isLoadingCategories } = api.categories.getAll.useQuery();
+  const { data: user } = api.tg.getUser.useQuery();
   
   useLayoutEffect(() => {
     // Проверяем, был ли уже обработан deep link в этой сессии
@@ -192,8 +193,15 @@ export default function HomeClient() {
               ))}
             </div>
           ) : (
-            <div className="text-center text-muted-foreground py-10">
-              Категории пока не добавлены
+            <div className="text-center text-muted-foreground py-10 space-y-2">
+              <div>Категории пока не добавлены</div>
+              {user && (
+                <div className="text-sm mt-4 p-4 bg-muted rounded-lg">
+                  <div className="font-semibold">Информация о пользователе:</div>
+                  <div>Username: {user.username ?? "не указан"}</div>
+                  <div>Role: {user.role ?? "не указана"}</div>
+                </div>
+              )}
             </div>
           )}
         </div>
