@@ -7,12 +7,11 @@ import Link from "next/link";
 import { Search, Plus, Image as ImageIcon, ChevronRight, Folder } from "lucide-react";
 
 export default function Settings() {
-  const { data: user, isLoading } = api.tg.getUser.useQuery();
-
-  // Debug logging
-  console.log("Settings page - user:", user);
-  console.log("Settings page - user role:", user?.role);
-  console.log("Settings page - user telegramId:", user?.telegramId);
+  const { data: user, isLoading } = api.tg.getUser.useQuery(undefined, {
+    staleTime: 0, // Не кэшировать, всегда запрашивать свежие данные
+    refetchOnMount: true,
+    refetchOnWindowFocus: true,
+  });
 
   if (isLoading) {
     return (
@@ -56,12 +55,6 @@ export default function Settings() {
   return (
     <div className="space-y-6 pb-52">
       <h1 className="text-2xl font-bold">Настройки</h1>
-      {/* Temporary debug info */}
-      <div className="text-sm text-muted-foreground p-4 bg-muted rounded-lg">
-        <p>Debug: User Role = {user?.role ?? "N/A"}</p>
-        <p>Debug: User Telegram ID = {user?.telegramId ?? "N/A"}</p>
-        <p>Debug: Filtered items count = {settingsItems.length}</p>
-      </div>
 
       <div className="">
         {settingsItems.map((item) => {
