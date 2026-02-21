@@ -15,12 +15,7 @@ export default function HomeClient() {
   const searchParams = useSearchParams();
   const [isChecking, setIsChecking] = useState(true);
   const { data: categories, isLoading: isLoadingCategories } = api.categories.getAll.useQuery();
-  // Проверяем, доступен ли Telegram WebApp перед запросом пользователя
-  const isTelegramReady = typeof window !== "undefined" && !!window.Telegram?.WebApp?.initData;
-  const { data: user, isLoading: isLoadingUser, error: userError } = api.tg.getUser.useQuery(
-    undefined,
-    { enabled: isTelegramReady }
-  );
+  const { data: user, isLoading: isLoadingUser, error: userError } = api.tg.getUser.useQuery();
   
   useLayoutEffect(() => {
     // Проверяем, был ли уже обработан deep link в этой сессии
@@ -203,8 +198,10 @@ export default function HomeClient() {
               <div className="text-sm mt-4 p-4 bg-muted rounded-lg">
                 <div className="font-semibold">Отладочная информация:</div>
                 <div>isLoadingUser: {isLoadingUser ? "true" : "false"}</div>
+                <div>Telegram WebApp: {typeof window !== "undefined" && window.Telegram?.WebApp ? "доступен" : "не доступен"}</div>
+                <div>initData: {typeof window !== "undefined" && window.Telegram?.WebApp?.initData ? "есть" : "нет"}</div>
                 <div>user: {user ? JSON.stringify({ id: user.id, name: user.name, telegramId: user.telegramId, role: user.role, username: user.username }) : "null"}</div>
-                <div>userError: {userError ? `${userError.message} (${userError.data?.code || 'no code'})` : "нет ошибки"}</div>
+                <div>userError: {userError ? `${userError.message} (code: ${userError.data?.code || 'unknown'})` : "нет ошибки"}</div>
                 {user && (
                   <>
                     <div className="font-semibold mt-2">Информация о пользователе:</div>
