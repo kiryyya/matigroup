@@ -172,11 +172,12 @@ async function checkOrCreateUser(webAppUser: TelegramWebApps.WebAppUser) {
         .update(users)
         .set({ username })
         .where(eq(users.telegramId, telegramId));
-      // Обновляем локальный объект user
-      user = await db.query.users.findFirst({
-        where: eq(users.telegramId, telegramId),
-      }) ?? user;
     }
+    // ВСЕГДА перезапрашиваем пользователя из БД, чтобы получить актуальную роль
+    // Это важно, если роль была изменена вручную в БД
+    user = await db.query.users.findFirst({
+      where: eq(users.telegramId, telegramId),
+    }) ?? user;
   }
 
   console.error(`[telegram-auth] Returning user: telegramId=${user.telegramId}, role=${user.role}, id=${user.id}`);
