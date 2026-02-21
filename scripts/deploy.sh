@@ -60,14 +60,16 @@ set_kv() {
 }
 
 echo "Preparing deploy: image=${next_image}, version=${APP_VERSION}"
-set_kv "APP_IMAGE" "$next_image" "$ENV_DEPLOY_FILE"
-set_kv "APP_VERSION" "$APP_VERSION" "$ENV_DEPLOY_FILE"
 
-echo "Cleaning up old Docker images to free space..."
-# Удаляем неиспользуемые образы, оставляя только последние 2 версии
-docker images --format "{{.Repository}}:{{.Tag}}" | grep "${next_image%%:*}" | grep -v "${APP_VERSION}" | tail -n +3 | xargs -r docker rmi -f || true
+# Очищаем место ПЕРЕД деплоем, чтобы избежать ошибок "no space left on device"
+echo "Cleaning up old Docker images to free space before deploy..."
 # Общая очистка неиспользуемых ресурсов (осторожно, не удаляет используемые)
 docker system prune -f --filter "until=24h" || true
+# Удаляем неиспользуемые образы, оставляя только последние 2 версии
+docker images --format "{{.Repository}}:{{.Tag}}" | grep "${next_image%%:*}" | grep -v "${APP_VERSION}" | tail -n +3 | xargs -r docker rmi -f || true
+
+set_kv "APP_IMAGE" "$next_image" "$ENV_DEPLOY_FILE"
+set_kv "APP_VERSION" "$APP_VERSION" "$ENV_DEPLOY_FILE"
 
 echo "Pulling and starting new version..."
 docker compose --env-file "$ENV_DEPLOY_FILE" pull app
