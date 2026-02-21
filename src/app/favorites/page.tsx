@@ -105,7 +105,7 @@ export default function FavoritesPage() {
             <Heart className="h-12 w-12 text-gray-400 mb-4" />
             <h3 className="text-lg font-semibold text-gray-900 mb-2">Пока пусто</h3>
             <p className="text-gray-600 text-center">
-              Добавьте проекты в избранное, нажав на сердечко
+              Добавьте проекты в избранное, нажав на сердечко в карточке проекта
             </p>
             <Link 
               href="/"
