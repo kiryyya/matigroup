@@ -15,7 +15,7 @@ export default function HomeClient() {
   const searchParams = useSearchParams();
   const [isChecking, setIsChecking] = useState(true);
   const { data: categories, isLoading: isLoadingCategories } = api.categories.getAll.useQuery();
-  const { data: user } = api.tg.getUser.useQuery();
+  const { data: user, isLoading: isLoadingUser, error: userError } = api.tg.getUser.useQuery();
   
   useLayoutEffect(() => {
     // Проверяем, был ли уже обработан deep link в этой сессии
@@ -195,14 +195,19 @@ export default function HomeClient() {
           ) : (
             <div className="text-center text-muted-foreground py-10 space-y-2">
               <div>Категории пока не добавлены</div>
-              <div>Категории пока не добавлены</div>
-              {user && (
-                <div className="text-sm mt-4 p-4 bg-muted rounded-lg">
-                  <div className="font-semibold">Информация о пользователе:</div>
-                  <div>Username: {user.username ?? "не указан"}</div>
-                  <div>Role: {user.role ?? "не указана"}</div>
-                </div>
-              )}
+              <div className="text-sm mt-4 p-4 bg-muted rounded-lg">
+                <div className="font-semibold">Отладочная информация:</div>
+                <div>isLoadingUser: {isLoadingUser ? "true" : "false"}</div>
+                <div>user: {user ? JSON.stringify({ id: user.id, name: user.name, telegramId: user.telegramId, role: user.role, username: user.username }) : "null"}</div>
+                <div>userError: {userError ? userError.message : "нет ошибки"}</div>
+                {user && (
+                  <>
+                    <div className="font-semibold mt-2">Информация о пользователе:</div>
+                    <div>Username: {user.username ?? "не указан"}</div>
+                    <div>Role: {user.role ?? "не указана"}</div>
+                  </>
+                )}
+              </div>
             </div>
           )}
         </div>
