@@ -7,7 +7,12 @@ import { ilike, or, eq, and, isNotNull } from "drizzle-orm";
 
 export const tgRouter = createTRPCRouter({
   getUser: procedure.query(async ({ ctx }) => {
-    console.error('[tgRouter] getUser called. ctx.user:', JSON.stringify(ctx.user, null, 2));
+    console.error('[tg.getUser] Returning user:', JSON.stringify({
+      id: ctx.user.id,
+      name: ctx.user.name,
+      telegramId: ctx.user.telegramId,
+      role: ctx.user.role,
+    }, null, 2));
     return ctx.user;
   }),
 

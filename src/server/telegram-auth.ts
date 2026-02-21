@@ -163,6 +163,7 @@ async function checkOrCreateUser(webAppUser: TelegramWebApps.WebAppUser) {
       .returning()
       .then((r) => r[0]);
   } else {
+    console.error(`[telegram-auth] Found existing user: telegramId=${telegramId}, role=${user.role}, id=${user.id}`);
     // Обновляем username если он изменился или был добавлен
     // Обновляем только если username изменился
     if (user.username !== username) {
@@ -178,5 +179,6 @@ async function checkOrCreateUser(webAppUser: TelegramWebApps.WebAppUser) {
     }
   }
 
+  console.error(`[telegram-auth] Returning user: telegramId=${user.telegramId}, role=${user.role}, id=${user.id}`);
   return user;
 }
