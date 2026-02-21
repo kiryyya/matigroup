@@ -15,30 +15,18 @@ export async function getTelegramUserFromHeaders(headers: Headers) {
     return null;
   }
 
-  // Парсим initData, но сохраняем оригинальные URL-encoded значения для валидации
-  const urlParams = new URLSearchParams(initData);
-  const data: Record<string, string> = {};
-  const originalValues: Record<string, string> = {};
-  
-  // Сохраняем и декодированные, и оригинальные значения
-  for (const [key, value] of urlParams.entries()) {
-    data[key] = value; // Декодированное значение (для использования)
-    // Для hash валидации нужно использовать оригинальные URL-encoded значения
-    // Но URLSearchParams уже декодирует, поэтому нужно получить оригинальные из строки
-    const match = initData.match(new RegExp(`${key}=([^&]*)`));
-    originalValues[key] = match ? match[1] ?? value : value;
-  }
-  
+  // Парсим initData
+  const data = Object.fromEntries(new URLSearchParams(initData));
   console.error('[telegram-auth] getTelegramUserFromHeaders: parsed data keys:', Object.keys(data).join(', '));
-  console.error('[telegram-auth] getTelegramUserFromHeaders: initData raw (first 200):', initData.substring(0, 200));
+  console.error('[telegram-auth] getTelegramUserFromHeaders: initData raw (first 300):', initData.substring(0, 300));
   
   if (!env.TELEGRAM_BOT_TOKEN) {
     console.error('[telegram-auth] getTelegramUserFromHeaders: TELEGRAM_BOT_TOKEN is missing!');
     return null;
   }
   
-  // Пробуем валидацию с оригинальными URL-encoded значениями
-  const isValid = await isHashValid(data, originalValues, env.TELEGRAM_BOT_TOKEN);
+  // Пробуем валидацию с оригинальными URL-encoded значениями из initData
+  const isValid = await isHashValid(data, initData, env.TELEGRAM_BOT_TOKEN);
   console.error('[telegram-auth] getTelegramUserFromHeaders: hash valid:', isValid);
   if (!isValid) {
     console.error('[telegram-auth] getTelegramUserFromHeaders: hash validation failed');
@@ -87,7 +75,7 @@ export async function requireTelegramAdmin(headers: Headers) {
   return user;
 }
 
-async function isHashValid(data: Record<string, string>, originalValues: Record<string, string>, botToken: string) {
+async function isHashValid(data: Record<string, string>, initDataRaw: string, botToken: string) {
   const encoder = new TextEncoder();
 
   // Детальное логирование для диагностики
@@ -104,15 +92,27 @@ async function isHashValid(data: Record<string, string>, originalValues: Record<
   
   console.error('[telegram-auth] isHashValid: Keys to check (sorted):', keysToCheck.join(', '));
   
-  // Пробуем использовать оригинальные URL-encoded значения
-  // Если их нет, используем декодированные
-  const checkString = keysToCheck
+  // Пробуем два варианта: с декодированными значениями и с оригинальными URL-encoded
+  // Вариант 1: с декодированными значениями (текущий)
+  const checkStringDecoded = keysToCheck
+    .map((key) => `${key}=${data[key]}`)
+    .join("\n");
+  
+  // Вариант 2: извлекаем оригинальные URL-encoded значения из initData
+  const checkStringEncoded = keysToCheck
     .map((key) => {
-      const value = originalValues[key] ?? data[key];
-      console.error(`[telegram-auth] isHashValid: Key ${key}: decoded="${data[key]?.substring(0, 50)}", original="${originalValues[key]?.substring(0, 50)}"`);
-      return `${key}=${value}`;
+      // Ищем оригинальное значение в initData (до декодирования)
+      const regex = new RegExp(`${key}=([^&]*)`);
+      const match = initDataRaw.match(regex);
+      const originalValue = match ? match[1] ?? data[key] : data[key];
+      console.error(`[telegram-auth] isHashValid: Key ${key}: decoded="${data[key]?.substring(0, 50)}", encoded="${originalValue?.substring(0, 50)}"`);
+      return `${key}=${originalValue}`;
     })
     .join("\n");
+  
+  // Пробуем оба варианта
+  const checkString = checkStringEncoded;
+  console.error('[telegram-auth] isHashValid: Using ENCODED values for checkString');
 
   console.error('[telegram-auth] isHashValid: checkString length:', checkString.length);
   console.error('[telegram-auth] isHashValid: checkString (first 200 chars):', checkString.substring(0, 200));
