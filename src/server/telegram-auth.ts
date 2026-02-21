@@ -178,5 +178,15 @@ async function checkOrCreateUser(webAppUser: TelegramWebApps.WebAppUser) {
     }
   }
 
+  // Отладка: логируем финальные данные пользователя
+  console.error(`[telegram-auth] Final user data:`, {
+    id: user.id,
+    name: user.name,
+    email: user.email,
+    role: user.role,
+    telegramId: user.telegramId,
+    username: user.username,
+  });
+
   return user;
 }
