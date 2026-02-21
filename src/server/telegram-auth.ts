@@ -23,14 +23,11 @@ export async function getTelegramUserFromHeaders(headers: Headers) {
     return null;
   }
   
-  // ВРЕМЕННО: отключаем валидацию hash для отладки
-  // TODO: вернуть валидацию после исправления
   const isValid = await isHashValid(data, env.TELEGRAM_BOT_TOKEN);
   console.error('[telegram-auth] getTelegramUserFromHeaders: hash valid:', isValid);
   if (!isValid) {
-    console.error('[telegram-auth] getTelegramUserFromHeaders: hash validation failed, but allowing for debugging');
-    // ВРЕМЕННО: пропускаем валидацию для отладки
-    // return null;
+    console.error('[telegram-auth] getTelegramUserFromHeaders: hash validation failed');
+    return null;
   }
 
   const webAppUser = JSON.parse(
