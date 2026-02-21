@@ -9,13 +9,18 @@ import { bot } from "~/server/telegram";
 
 export async function getTelegramUserFromHeaders(headers: Headers) {
   const initData = headers.get("x-telegram-init-data");
+  console.error('[telegram-auth] getTelegramUserFromHeaders: initData present:', !!initData);
   if (!initData) {
+    console.error('[telegram-auth] getTelegramUserFromHeaders: initData is missing');
     return null;
   }
 
   const data = Object.fromEntries(new URLSearchParams(initData));
+  console.error('[telegram-auth] getTelegramUserFromHeaders: parsed data keys:', Object.keys(data).join(', '));
   const isValid = await isHashValid(data, env.TELEGRAM_BOT_TOKEN);
+  console.error('[telegram-auth] getTelegramUserFromHeaders: hash valid:', isValid);
   if (!isValid) {
+    console.error('[telegram-auth] getTelegramUserFromHeaders: hash validation failed');
     return null;
   }
 
