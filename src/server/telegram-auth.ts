@@ -70,10 +70,14 @@ async function isHashValid(data: Record<string, string>, botToken: string) {
   const encoder = new TextEncoder();
 
   const checkString = Object.keys(data)
-    .filter((key) => key !== "hash")
+    .filter((key) => key !== "hash" && key !== "signature")
     .map((key) => `${key}=${data[key]}`)
     .sort()
     .join("\n");
+
+  console.error('[telegram-auth] isHashValid: checkString length:', checkString.length);
+  console.error('[telegram-auth] isHashValid: botToken length:', botToken.length);
+  console.error('[telegram-auth] isHashValid: data.hash:', data.hash?.substring(0, 20) + '...');
 
   const secretKey = await webcrypto.subtle.importKey(
     "raw",
@@ -104,6 +108,10 @@ async function isHashValid(data: Record<string, string>, botToken: string) {
   );
 
   const hex = Buffer.from(signature).toString("hex");
+  console.error('[telegram-auth] isHashValid: calculated hash:', hex.substring(0, 20) + '...');
+  console.error('[telegram-auth] isHashValid: provided hash:', data.hash?.substring(0, 20) + '...');
+  console.error('[telegram-auth] isHashValid: match:', data.hash === hex);
+  
   return data.hash === hex;
 }
 
