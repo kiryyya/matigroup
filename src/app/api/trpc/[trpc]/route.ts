@@ -20,10 +20,15 @@ const createContext = async (req: NextRequest) => {
 };
 
 const handler = (req: NextRequest) => {
+  const url = new URL(req.url);
+  console.error(`[tRPC] Request: ${req.method} ${url.pathname}${url.search}`);
+  console.error(`[tRPC] Headers: x-telegram-init-data present: ${!!req.headers.get("x-telegram-init-data")}`);
+  
   // CSRF защита для tRPC запросов
   try {
     validateCSRFForTRPC(req.headers);
   } catch (error) {
+    console.error(`[tRPC] CSRF validation failed:`, error);
     // Если CSRF проверка не прошла, возвращаем ошибку
     return new Response(
       JSON.stringify({ error: error instanceof Error ? error.message : "CSRF validation failed" }),
