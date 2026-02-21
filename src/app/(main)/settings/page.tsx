@@ -9,6 +9,11 @@ import { Search, Plus, Image as ImageIcon, ChevronRight, Folder } from "lucide-r
 export default function Settings() {
   const { data: user, isLoading } = api.tg.getUser.useQuery();
 
+  // Debug logging
+  console.log("Settings page - user:", user);
+  console.log("Settings page - user role:", user?.role);
+  console.log("Settings page - user telegramId:", user?.telegramId);
+
   if (isLoading) {
     return (
       <div className="flex h-full w-full items-center justify-center">
@@ -16,11 +21,6 @@ export default function Settings() {
       </div>
     );
   }
-
-  // Отладка: логируем данные пользователя
-  console.log("Settings page - user data:", user);
-  console.log("Settings page - user role:", user?.role);
-  console.log("Settings page - is admin?", user?.role === "admin");
 
   const settingsItems = [
     {
@@ -56,27 +56,15 @@ export default function Settings() {
   return (
     <div className="space-y-6 pb-52">
       <h1 className="text-2xl font-bold">Настройки</h1>
-
-      {/* Временная отладочная информация */}
-      {process.env.NODE_ENV === "development" && (
-        <div className="p-4 bg-muted rounded-lg text-sm">
-          <p>User ID: {user?.id}</p>
-          <p>User Role: {user?.role || "не определено"}</p>
-          <p>Telegram ID: {user?.telegramId}</p>
-          <p>Is Admin: {user?.role === "admin" ? "Да" : "Нет"}</p>
-          <p>Filtered items count: {settingsItems.length}</p>
-        </div>
-      )}
+      {/* Temporary debug info */}
+      <div className="text-sm text-muted-foreground p-4 bg-muted rounded-lg">
+        <p>Debug: User Role = {user?.role ?? "N/A"}</p>
+        <p>Debug: User Telegram ID = {user?.telegramId ?? "N/A"}</p>
+        <p>Debug: Filtered items count = {settingsItems.length}</p>
+      </div>
 
       <div className="">
-        {settingsItems.length === 0 ? (
-          <div className="p-4 bg-muted rounded-lg">
-            <p className="text-muted-foreground">
-              Нет доступных настроек. Ваша роль: {user?.role || "не определена"}
-            </p>
-          </div>
-        ) : (
-          settingsItems.map((item) => {
+        {settingsItems.map((item) => {
           const Icon = item.icon;
           return (
             <Link key={item.href} href={item.href}>
@@ -100,7 +88,7 @@ export default function Settings() {
               </Card>
             </Link>
           );
-        }))}
+        })}
       </div>
     </div>
   );
