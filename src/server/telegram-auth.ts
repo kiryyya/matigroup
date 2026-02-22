@@ -93,7 +93,7 @@ async function isHashValid(data: Record<string, string>, initDataRaw: string, bo
   console.error('[telegram-auth] isHashValid: Keys to check (sorted):', keysToCheck.join(', '));
   
   // Пробуем два варианта: с декодированными значениями и с оригинальными URL-encoded
-  // Вариант 1: с декодированными значениями (текущий)
+  // Вариант 1: с декодированными значениями
   const checkStringDecoded = keysToCheck
     .map((key) => `${key}=${data[key]}`)
     .join("\n");
@@ -105,18 +105,32 @@ async function isHashValid(data: Record<string, string>, initDataRaw: string, bo
       const regex = new RegExp(`${key}=([^&]*)`);
       const match = initDataRaw.match(regex);
       const originalValue = match ? match[1] ?? data[key] : data[key];
-      console.error(`[telegram-auth] isHashValid: Key ${key}: decoded="${data[key]?.substring(0, 50)}", encoded="${originalValue?.substring(0, 50)}"`);
       return `${key}=${originalValue}`;
     })
     .join("\n");
   
-  // Пробуем оба варианта
-  const checkString = checkStringEncoded;
-  console.error('[telegram-auth] isHashValid: Using ENCODED values for checkString');
+  // Пробуем оба варианта и возвращаем результат, если хотя бы один совпадает
+  console.error('[telegram-auth] isHashValid: Trying DECODED values first');
+  const resultDecoded = await validateHashWithCheckString(checkStringDecoded, data, botToken, encoder);
+  if (resultDecoded) {
+    console.error('[telegram-auth] isHashValid: DECODED values match!');
+    return true;
+  }
+  
+  console.error('[telegram-auth] isHashValid: DECODED failed, trying ENCODED values');
+  const resultEncoded = await validateHashWithCheckString(checkStringEncoded, data, botToken, encoder);
+  if (resultEncoded) {
+    console.error('[telegram-auth] isHashValid: ENCODED values match!');
+    return true;
+  }
+  
+  return false;
+}
 
-  console.error('[telegram-auth] isHashValid: checkString length:', checkString.length);
-  console.error('[telegram-auth] isHashValid: checkString (first 200 chars):', checkString.substring(0, 200));
-  console.error('[telegram-auth] isHashValid: checkString (escaped newlines):', checkString.replace(/\n/g, '\\n').substring(0, 200));
+async function validateHashWithCheckString(checkString: string, data: Record<string, string>, botToken: string, encoder: TextEncoder) {
+  console.error('[telegram-auth] validateHashWithCheckString: checkString length:', checkString.length);
+  console.error('[telegram-auth] validateHashWithCheckString: checkString (first 200 chars):', checkString.substring(0, 200));
+  console.error('[telegram-auth] validateHashWithCheckString: checkString (escaped newlines):', checkString.replace(/\n/g, '\\n').substring(0, 200));
 
   // Шаг 1: Создаем секретный ключ для "WebAppData"
   const secretKey = await webcrypto.subtle.importKey(
@@ -164,37 +178,42 @@ async function isHashValid(data: Record<string, string>, initDataRaw: string, bo
   // Проверяем hash (он должен быть в hex)
   const hashMatch = data.hash ? data.hash === hex : false;
   
-  // Проверяем signature (он может быть в base64, нужно декодировать)
+  // Проверяем signature (он может быть в base64url, нужно декодировать)
   let signatureMatch = false;
   if (data.signature) {
     try {
-      // Пробуем декодировать base64
-      const signatureBytes = Buffer.from(data.signature, 'base64');
+      // Пробуем декодировать base64url (Telegram использует base64url, а не base64)
+      // base64url использует - и _ вместо + и /
+      const base64 = data.signature.replace(/-/g, '+').replace(/_/g, '/');
+      // Добавляем padding если нужно
+      const padding = base64.length % 4;
+      const paddedBase64 = padding ? base64 + '='.repeat(4 - padding) : base64;
+      const signatureBytes = Buffer.from(paddedBase64, 'base64');
       const signatureHex = Array.from(new Uint8Array(signatureBytes))
         .map(b => b.toString(16).padStart(2, "0"))
         .join("");
       signatureMatch = signatureHex === hex;
-      console.error('[telegram-auth] isHashValid: Signature (decoded from base64):', signatureHex);
-      console.error('[telegram-auth] isHashValid: Signature match (base64 decoded):', signatureMatch);
+      console.error('[telegram-auth] validateHashWithCheckString: Signature (decoded from base64url):', signatureHex.substring(0, 64) + '...');
+      console.error('[telegram-auth] validateHashWithCheckString: Signature match (base64url decoded):', signatureMatch);
     } catch (e) {
-      // Если не base64, пробуем как hex
+      // Если не base64url, пробуем как hex
       signatureMatch = data.signature === hex;
-      console.error('[telegram-auth] isHashValid: Signature (as hex):', data.signature);
-      console.error('[telegram-auth] isHashValid: Signature match (as hex):', signatureMatch);
+      console.error('[telegram-auth] validateHashWithCheckString: Signature (as hex):', data.signature.substring(0, 64) + '...');
+      console.error('[telegram-auth] validateHashWithCheckString: Signature match (as hex):', signatureMatch);
     }
   }
   
   const match = hashMatch || signatureMatch;
   
-  console.error('[telegram-auth] isHashValid: Hash match:', hashMatch);
-  console.error('[telegram-auth] isHashValid: Signature match:', signatureMatch);
-  console.error('[telegram-auth] isHashValid: Final match:', match);
+  console.error('[telegram-auth] validateHashWithCheckString: Hash match:', hashMatch);
+  console.error('[telegram-auth] validateHashWithCheckString: Signature match:', signatureMatch);
+  console.error('[telegram-auth] validateHashWithCheckString: Final match:', match);
   
   if (!match) {
-    console.error('[telegram-auth] isHashValid: VALIDATION FAILED');
-    console.error('[telegram-auth] isHashValid: Calculated:', hex);
-    console.error('[telegram-auth] isHashValid: Provided hash:', data.hash);
-    console.error('[telegram-auth] isHashValid: Provided signature:', data.signature);
+    console.error('[telegram-auth] validateHashWithCheckString: VALIDATION FAILED');
+    console.error('[telegram-auth] validateHashWithCheckString: Calculated:', hex);
+    console.error('[telegram-auth] validateHashWithCheckString: Provided hash:', data.hash);
+    console.error('[telegram-auth] validateHashWithCheckString: Provided signature:', data.signature);
   }
   
   return match;
