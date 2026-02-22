@@ -27,19 +27,11 @@ import { getTelegramUserFromHeaders } from "~/server/telegram-auth";
  * @see https://trpc.io/docs/server/context
  */
 export const createTRPCContext = async (opts: { headers: Headers }) => {
-  const initData = opts.headers.get("x-telegram-init-data");
-  console.error('[trpc] createTRPCContext: initData present:', !!initData);
-  
   const user = await getTelegramUserFromHeaders(opts.headers);
   if (!user) {
-    console.error('[trpc] createTRPCContext: user is null, initData:', initData ? 'present' : 'missing');
-    throw new TRPCError({ 
-      code: "UNAUTHORIZED",
-      message: initData ? "Failed to authenticate user" : "Missing Telegram initData"
-    });
+    throw new TRPCError({ code: "UNAUTHORIZED" });
   }
 
-  console.error('[trpc] createTRPCContext: user found:', { id: user.id, telegramId: user.telegramId, role: user.role });
   return {
     db,
     ...opts,
