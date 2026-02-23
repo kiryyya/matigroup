@@ -9,6 +9,39 @@ export const revalidate = 0;
 // Prevent static generation
 export const dynamicParams = true;
 
+const ALLOWED_IMAGE_MIME_TYPES = new Set([
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+  "image/gif",
+  "image/avif",
+]);
+
+function normalizeImageMimeType(contentType?: string): string | null {
+  if (!contentType) {
+    return null;
+  }
+
+  const mimeType = contentType.split(";")[0]?.trim().toLowerCase();
+  if (!mimeType) {
+    return null;
+  }
+
+  return ALLOWED_IMAGE_MIME_TYPES.has(mimeType) ? mimeType : null;
+}
+
+function buildImageResponse(bodyBuffer: Buffer, contentType: string) {
+  return new NextResponse(bodyBuffer, {
+    status: 200,
+    headers: {
+      "Content-Type": contentType,
+      "Cache-Control": "public, max-age=31536000, immutable",
+      "Content-Length": bodyBuffer.length.toString(),
+      "X-Content-Type-Options": "nosniff",
+    },
+  });
+}
+
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ path: string[] }> | { path: string[] } }
@@ -33,18 +66,16 @@ export async function GET(
 
       // Преобразуем тело в буфер
       const bodyBuffer = Buffer.from(await s3Object.Body.transformToByteArray());
-      
-      // Определяем Content-Type из метаданных или по расширению
-      const contentType = s3Object.ContentType || 'application/octet-stream';
-      
-      return new NextResponse(bodyBuffer, {
-        status: 200,
-        headers: {
-          "Content-Type": contentType,
-          "Cache-Control": "public, max-age=31536000, immutable",
-          "Content-Length": bodyBuffer.length.toString(),
-        },
-      });
+
+      const contentType = normalizeImageMimeType(s3Object.ContentType);
+      if (!contentType) {
+        return NextResponse.json(
+          { error: "Unsupported image content type" },
+          { status: 415, headers: { "X-Content-Type-Options": "nosniff" } },
+        );
+      }
+
+      return buildImageResponse(bodyBuffer, contentType);
     } catch (s3Error: unknown) {
       // Если это preview и файл не найден, пытаемся загрузить original
       if (key.includes('-preview-')) {
@@ -54,16 +85,15 @@ export async function GET(
           
           if (s3Object.Body) {
             const bodyBuffer = Buffer.from(await s3Object.Body.transformToByteArray());
-            const contentType = s3Object.ContentType || 'application/octet-stream';
-            
-            return new NextResponse(bodyBuffer, {
-              status: 200,
-              headers: {
-                "Content-Type": contentType,
-                "Cache-Control": "public, max-age=31536000, immutable",
-                "Content-Length": bodyBuffer.length.toString(),
-              },
-            });
+            const contentType = normalizeImageMimeType(s3Object.ContentType);
+            if (!contentType) {
+              return NextResponse.json(
+                { error: "Unsupported image content type" },
+                { status: 415, headers: { "X-Content-Type-Options": "nosniff" } },
+              );
+            }
+
+            return buildImageResponse(bodyBuffer, contentType);
           }
         } catch (originalError) {
           // Если и original не найден, возвращаем ошибку
