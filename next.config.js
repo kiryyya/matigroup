@@ -14,6 +14,21 @@ if (process.env.SKIP_ENV_VALIDATION !== "true") {
 }
 
 /** @type {import("next").NextConfig} */
+const cspHeader = [
+  "default-src 'self'",
+  "script-src 'self' 'unsafe-inline' https://telegram.org https://*.telegram.org",
+  "style-src 'self' 'unsafe-inline'",
+  "img-src 'self' data: blob: https:",
+  "font-src 'self' data:",
+  "connect-src 'self' https: wss:",
+  "media-src 'self' blob: https:",
+  "object-src 'none'",
+  "base-uri 'self'",
+  "form-action 'self'",
+  "frame-ancestors 'self' https://web.telegram.org https://webk.telegram.org https://webz.telegram.org https://*.telegram.org",
+  "upgrade-insecure-requests",
+].join("; ");
+
 const config = {
   eslint: {
     ignoreDuringBuilds: true,
@@ -36,6 +51,27 @@ const config = {
           ]
         : []),
     ],
+  },
+  async headers() {
+    return [
+      {
+        source: "/:path*",
+        headers: [
+          {
+            key: "Content-Security-Policy",
+            value: cspHeader,
+          },
+          {
+            key: "X-Content-Type-Options",
+            value: "nosniff",
+          },
+          {
+            key: "Referrer-Policy",
+            value: "strict-origin-when-cross-origin",
+          },
+        ],
+      },
+    ];
   },
 };
 

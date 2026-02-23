@@ -4,6 +4,7 @@ import { z } from "zod";
 import { categories, projects, users } from "~/server/db/schema";
 import { eq, and, desc, lt } from "drizzle-orm";
 import type { StoredImage } from "~/types/files";
+import sanitizeHtml from "sanitize-html";
 
 // Вспомогательная функция для парсинга изображений из JSON
 function parseImages(images: unknown): StoredImage[] {
@@ -90,6 +91,42 @@ function transformImages(images: StoredImage[]): StoredImage[] {
   });
 }
 
+function sanitizeProjectContent(content?: string | null): string | undefined {
+  if (!content) {
+    return undefined;
+  }
+
+  return sanitizeHtml(content, {
+    allowedTags: [
+      "p",
+      "br",
+      "strong",
+      "em",
+      "u",
+      "s",
+      "blockquote",
+      "ul",
+      "ol",
+      "li",
+      "h1",
+      "h2",
+      "h3",
+      "h4",
+      "h5",
+      "h6",
+      "a",
+      "img",
+      "code",
+      "pre",
+    ],
+    allowedAttributes: {
+      a: ["href", "target", "rel"],
+      img: ["src", "alt", "title"],
+    },
+    allowedSchemes: ["http", "https", "mailto", "tel"],
+  });
+}
+
 export const projectsRouter = createTRPCRouter({
   // Get all categories
   categories: procedure.query(async () => {
@@ -170,6 +207,7 @@ export const projectsRouter = createTRPCRouter({
         
         return {
           ...project,
+          content: sanitizeProjectContent(project.content),
           images: listImage ? [listImage] : [], // Только первое изображение для превью
           attachments: [], // Без вложений в списке
         };
@@ -203,6 +241,7 @@ export const projectsRouter = createTRPCRouter({
       const imagesArray = parseImages(project.images);
       return {
         ...project,
+        content: sanitizeProjectContent(project.content),
         images: transformImages(imagesArray),
       };
     }),
@@ -231,6 +270,7 @@ export const projectsRouter = createTRPCRouter({
       const imagesArray = parseImages(project.images);
       return {
         ...project,
+        content: sanitizeProjectContent(project.content),
         images: transformImages(imagesArray),
       };
     }),
@@ -254,6 +294,7 @@ export const projectsRouter = createTRPCRouter({
       const imagesArray = parseImages(project.images);
       return {
         ...project,
+        content: sanitizeProjectContent(project.content),
         images: transformImages(imagesArray),
       };
     });
@@ -277,6 +318,7 @@ export const projectsRouter = createTRPCRouter({
       const imagesArray = parseImages(project.images);
       return {
         ...project,
+        content: sanitizeProjectContent(project.content),
         images: transformImages(imagesArray),
       };
     });
@@ -325,8 +367,13 @@ export const projectsRouter = createTRPCRouter({
       }
 
       try {
-        const result = await db.insert(projects).values({
+        const sanitizedInput = {
           ...input,
+          content: sanitizeProjectContent(input.content),
+        };
+
+        const result = await db.insert(projects).values({
+          ...sanitizedInput,
           userId: ctx.user.id,
         }).returning();
         
@@ -338,7 +385,11 @@ export const projectsRouter = createTRPCRouter({
           },
         });
         
-        return createdProject ?? result[0];
+        const projectResponse = createdProject ?? result[0];
+        return {
+          ...projectResponse,
+          content: sanitizeProjectContent(projectResponse?.content),
+        };
       } catch (error) {
         console.error("Error creating project:", error);
         if (error instanceof Error) {
@@ -392,9 +443,15 @@ export const projectsRouter = createTRPCRouter({
       }
 
       const { id, ...updateData } = input;
+      const sanitizedUpdateData = {
+        ...updateData,
+        ...(updateData.content !== undefined
+          ? { content: sanitizeProjectContent(updateData.content) }
+          : {}),
+      };
       return await db
         .update(projects)
-        .set(updateData)
+        .set(sanitizedUpdateData)
         .where(eq(projects.id, id));
     }),
 
@@ -475,6 +532,7 @@ export const projectsRouter = createTRPCRouter({
             
             projectsData.push({
               ...project,
+              content: sanitizeProjectContent(project.content),
               images: listImage ? [listImage] : [], // Только первое изображение для превью
               attachments: [], // Без вложений в списке
             });
