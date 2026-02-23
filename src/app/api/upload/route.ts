@@ -6,6 +6,7 @@ import { db } from "~/server/db";
 import { settings } from "~/server/db/schema";
 import { eq } from "drizzle-orm";
 import { validateCSRF } from "~/lib/csrf";
+import { checkRateLimit, getClientIp } from "~/lib/rate-limit";
 
 // Force dynamic rendering - don't execute during build
 export const dynamic = 'force-dynamic';
@@ -19,6 +20,23 @@ function sanitizeFileName(name: string) {
 
 export async function POST(request: NextRequest) {
   try {
+    const ip = getClientIp(request.headers);
+    const rateLimitResult = checkRateLimit(`upload:${ip}`, {
+      windowMs: 60_000,
+      maxRequests: 30,
+    });
+    if (!rateLimitResult.allowed) {
+      return NextResponse.json(
+        { error: "Too many upload requests" },
+        {
+          status: 429,
+          headers: {
+            "Retry-After": rateLimitResult.retryAfterSeconds.toString(),
+          },
+        },
+      );
+    }
+
     // CSRF защита
     validateCSRF(request);
     

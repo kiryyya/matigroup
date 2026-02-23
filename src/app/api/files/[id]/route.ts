@@ -6,6 +6,7 @@ import { addWatermarkToFile } from "~/lib/watermark";
 import { getPrivateObject } from "~/lib/storage";
 import { requireTelegramUser } from "~/server/telegram-auth";
 import { validateCSRF } from "~/lib/csrf";
+import { checkRateLimit, getClientIp } from "~/lib/rate-limit";
 
 // Force dynamic rendering - don't execute during build
 export const dynamic = 'force-dynamic';
@@ -21,6 +22,23 @@ export async function GET(
   { params }: RouteParams
 ) {
   try {
+    const ip = getClientIp(request.headers);
+    const rateLimitResult = checkRateLimit(`files:${ip}`, {
+      windowMs: 60_000,
+      maxRequests: 120,
+    });
+    if (!rateLimitResult.allowed) {
+      return NextResponse.json(
+        { error: "Too many download requests" },
+        {
+          status: 429,
+          headers: {
+            "Retry-After": rateLimitResult.retryAfterSeconds.toString(),
+          },
+        },
+      );
+    }
+
     // CSRF защита (для GET запросов проверка менее строгая, но все равно проверяем Origin)
     try {
       validateCSRF(request);

@@ -12,6 +12,35 @@ const ALLOWED_ORIGINS = [
   process.env.NEXT_PUBLIC_APP_URL,
 ].filter(Boolean) as string[];
 
+function isSafeMethod(method: string): boolean {
+  return method === "GET" || method === "HEAD" || method === "OPTIONS";
+}
+
+function isOriginAllowed(value: string | null): boolean {
+  if (!value) {
+    return false;
+  }
+
+  try {
+    const valueUrl = new URL(value);
+    return ALLOWED_ORIGINS.some((allowed) => {
+      try {
+        const allowedUrl = new URL(allowed);
+        return valueUrl.origin === allowedUrl.origin;
+      } catch {
+        return false;
+      }
+    });
+  } catch {
+    return false;
+  }
+}
+
+function hasTelegramInitData(headers: Headers): boolean {
+  const initData = headers.get("x-telegram-init-data");
+  return Boolean(initData && initData.trim().length > 0);
+}
+
 /**
  * Проверяет CSRF защиту для запроса
  * @param request - Next.js request объект
@@ -19,90 +48,31 @@ const ALLOWED_ORIGINS = [
  */
 export function validateCSRF(request: NextRequest): boolean {
   const method = request.method;
-  
-  // GET и HEAD запросы не требуют строгой CSRF защиты
-  // Но если Origin/Referer присутствуют, проверяем их для дополнительной безопасности
-  if (method === "GET" || method === "HEAD") {
-    const origin = request.headers.get("origin");
-    const referer = request.headers.get("referer");
-    
-    // Если есть Origin или Referer, проверяем их (но не блокируем, если их нет)
-    if (origin || referer) {
-      if (origin) {
-        try {
-          const originUrl = new URL(origin);
-          const isAllowed = ALLOWED_ORIGINS.some((allowed) => {
-            try {
-              const allowedUrl = new URL(allowed);
-              return originUrl.origin === allowedUrl.origin;
-            } catch {
-              return false;
-            }
-          });
-          
-          if (!isAllowed) {
-            console.warn("CSRF: Invalid Origin header for GET request:", origin);
-            // Для GET не блокируем, только логируем
-          }
-        } catch {
-          // Игнорируем ошибки парсинга для GET
-        }
-      }
-    }
-    
+
+  // Безопасные методы не требуют строгой CSRF защиты.
+  if (isSafeMethod(method)) {
     return true;
   }
 
-  // Для POST, PUT, DELETE, PATCH проверяем Origin и Referer
-  const origin = request.headers.get("origin");
-  const referer = request.headers.get("referer");
-  
-  // Если есть Origin, проверяем его
-  if (origin) {
-    const originUrl = new URL(origin);
-    const isAllowed = ALLOWED_ORIGINS.some((allowed) => {
-      try {
-        const allowedUrl = new URL(allowed);
-        return originUrl.origin === allowedUrl.origin;
-      } catch {
-        return false;
-      }
-    });
-    
-    if (!isAllowed) {
-      throw new Error("CSRF: Invalid Origin header");
-    }
-  }
-  
-  // Если есть Referer, проверяем его
-  if (referer) {
-    try {
-      const refererUrl = new URL(referer);
-      const isAllowed = ALLOWED_ORIGINS.some((allowed) => {
-        try {
-          const allowedUrl = new URL(allowed);
-          return refererUrl.origin === allowedUrl.origin;
-        } catch {
-          return false;
-        }
-      });
-      
-      if (!isAllowed) {
-        throw new Error("CSRF: Invalid Referer header");
-      }
-    } catch {
-      throw new Error("CSRF: Invalid Referer header format");
-    }
+  // Для Telegram WebApp initData является отдельным валидируемым фактором.
+  if (hasTelegramInitData(request.headers)) {
+    return true;
   }
 
-  // Для Telegram Web App также проверяем наличие initData
-  // Это дополнительная защита, так как initData подписывается ботом
-  const initData = request.headers.get("x-telegram-init-data");
-  if (!initData && (method === "POST" || method === "PUT" || method === "DELETE" || method === "PATCH")) {
-    // Для мутаций требуем initData (кроме публичных эндпоинтов)
-    // Но не блокируем, так как может быть публичный эндпоинт
-    // Просто логируем предупреждение
-    console.warn("CSRF: POST/PUT/DELETE request without Telegram initData");
+  const origin = request.headers.get("origin");
+  const referer = request.headers.get("referer");
+
+  // Для mutating-запросов требуем хотя бы один браузерный источник.
+  if (!origin && !referer) {
+    throw new Error("CSRF: Missing Origin/Referer and Telegram initData");
+  }
+
+  if (origin && !isOriginAllowed(origin)) {
+    throw new Error("CSRF: Invalid Origin header");
+  }
+
+  if (referer && !isOriginAllowed(referer)) {
+    throw new Error("CSRF: Invalid Referer header");
   }
 
   return true;
@@ -114,67 +84,37 @@ export function validateCSRF(request: NextRequest): boolean {
  * @throws TRPCError если запрос небезопасен
  */
 export function validateCSRFForTRPC(headers: Headers): void {
-  const method = headers.get("x-http-method-override") || "POST";
-  
-  // GET запросы не требуют CSRF защиты
-  if (method === "GET" || method === "HEAD") {
+  const method = headers.get("x-http-method-override") ?? "POST";
+
+  if (isSafeMethod(method)) {
     return;
   }
 
-  // Если есть Telegram initData, это достаточная защита
-  // initData подписывается ботом и не может быть подделан
-  const initData = headers.get("x-telegram-init-data");
-  if (initData) {
-    return; // Пропускаем проверку Origin/Referer для Telegram WebApp
+  if (hasTelegramInitData(headers)) {
+    return;
   }
 
   const origin = headers.get("origin");
   const referer = headers.get("referer");
-  
-  // Проверяем Origin
-  if (origin) {
-    const originUrl = new URL(origin);
-    const isAllowed = ALLOWED_ORIGINS.some((allowed) => {
-      try {
-        const allowedUrl = new URL(allowed);
-        return originUrl.origin === allowedUrl.origin;
-      } catch {
-        return false;
-      }
+
+  if (!origin && !referer) {
+    throw new TRPCError({
+      code: "FORBIDDEN",
+      message: "CSRF: Missing Origin/Referer and Telegram initData",
     });
-    
-    if (!isAllowed) {
-      throw new TRPCError({
-        code: "FORBIDDEN",
-        message: "CSRF: Invalid Origin header",
-      });
-    }
   }
-  
-  // Проверяем Referer
-  if (referer) {
-    try {
-      const refererUrl = new URL(referer);
-      const isAllowed = ALLOWED_ORIGINS.some((allowed) => {
-        try {
-          const allowedUrl = new URL(allowed);
-          return refererUrl.origin === allowedUrl.origin;
-        } catch {
-          return false;
-        }
-      });
-      
-      if (!isAllowed) {
-        throw new TRPCError({
-          code: "FORBIDDEN",
-          message: "CSRF: Invalid Referer header",
-        });
-      }
-    } catch {
-      throw new TRPCError({
-        code: "FORBIDDEN",
-        message: "CSRF: Invalid Referer header format",
-      });
-    }
+
+  if (origin && !isOriginAllowed(origin)) {
+    throw new TRPCError({
+      code: "FORBIDDEN",
+      message: "CSRF: Invalid Origin header",
+    });
+  }
+
+  if (referer && !isOriginAllowed(referer)) {
+    throw new TRPCError({
+      code: "FORBIDDEN",
+      message: "CSRF: Invalid Referer header",
+    });
   }
 }

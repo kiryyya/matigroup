@@ -5,6 +5,7 @@ import { db } from "~/server/db";
 import { users } from "~/server/db/schema";
 import { bot } from "~/server/telegram";
 import { env } from "~/env";
+import { checkRateLimit, getClientIp } from "~/lib/rate-limit";
 
 // Force dynamic rendering - don't execute during build
 export const dynamic = 'force-dynamic';
@@ -122,6 +123,20 @@ export const GET = async (req: Request) => {
 };
 
 export const POST = async (req: Request) => {
+  const ip = getClientIp(req.headers);
+  const rateLimitResult = checkRateLimit(`webhook:${ip}`, {
+    windowMs: 60_000,
+    maxRequests: 240,
+  });
+  if (!rateLimitResult.allowed) {
+    return new Response("Too many requests", {
+      status: 429,
+      headers: {
+        "Retry-After": rateLimitResult.retryAfterSeconds.toString(),
+      },
+    });
+  }
+
   const secretToken = req.headers.get("x-telegram-bot-api-secret-token");
   if (!secretToken || secretToken !== env.TELEGRAM_WEBHOOK_SECRET) {
     return new Response("Unauthorized", { status: 401 });

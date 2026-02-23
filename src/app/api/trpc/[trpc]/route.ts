@@ -1,10 +1,10 @@
 import { fetchRequestHandler } from "@trpc/server/adapters/fetch";
 import { type NextRequest } from "next/server";
 
-import { env } from "~/env";
 import { appRouter } from "~/server/api/root";
 import { createTRPCContext } from "~/server/api/trpc";
 import { validateCSRFForTRPC } from "~/lib/csrf";
+import { checkRateLimit, getClientIp } from "~/lib/rate-limit";
 
 // Force dynamic rendering - don't execute during build
 export const dynamic = 'force-dynamic';
@@ -23,6 +23,24 @@ const handler = (req: NextRequest) => {
   const url = new URL(req.url);
   console.error(`[tRPC] Request: ${req.method} ${url.pathname}${url.search}`);
   console.error(`[tRPC] Headers: x-telegram-init-data present: ${!!req.headers.get("x-telegram-init-data")}`);
+
+  const ip = getClientIp(req.headers);
+  const rateLimitResult = checkRateLimit(`trpc:${ip}`, {
+    windowMs: 60_000,
+    maxRequests: 180,
+  });
+  if (!rateLimitResult.allowed) {
+    return new Response(
+      JSON.stringify({ error: "Too many requests" }),
+      {
+        status: 429,
+        headers: {
+          "Content-Type": "application/json",
+          "Retry-After": rateLimitResult.retryAfterSeconds.toString(),
+        },
+      },
+    );
+  }
   
   // CSRF защита для tRPC запросов
   try {
