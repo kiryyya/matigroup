@@ -11,26 +11,22 @@ const TELEGRAM_INIT_DATA_FUTURE_SKEW_SECONDS = 30;
 
 export async function getTelegramUserFromHeaders(headers: Headers) {
   const initData = headers.get("x-telegram-init-data");
-  console.error('[telegram-auth] getTelegramUserFromHeaders: initData present:', !!initData);
   if (!initData) {
-    console.error('[telegram-auth] getTelegramUserFromHeaders: initData is missing');
+    console.error("[telegram-auth] getTelegramUserFromHeaders: initData is missing");
     return null;
   }
 
   // Парсим initData
   const data = Object.fromEntries(new URLSearchParams(initData));
-  console.error('[telegram-auth] getTelegramUserFromHeaders: parsed data keys:', Object.keys(data).join(', '));
-  console.error('[telegram-auth] getTelegramUserFromHeaders: initData raw (first 300):', initData.substring(0, 300));
   
   if (!env.TELEGRAM_BOT_TOKEN) {
-    console.error('[telegram-auth] getTelegramUserFromHeaders: TELEGRAM_BOT_TOKEN is missing!');
+    console.error("[telegram-auth] getTelegramUserFromHeaders: TELEGRAM_BOT_TOKEN is missing");
     return null;
   }
   
   const isValid = isHashValid(data, env.TELEGRAM_BOT_TOKEN);
-  console.error('[telegram-auth] getTelegramUserFromHeaders: hash valid:', isValid);
   if (!isValid) {
-    console.error('[telegram-auth] getTelegramUserFromHeaders: hash validation failed');
+    console.error("[telegram-auth] getTelegramUserFromHeaders: hash validation failed");
     return null;
   }
 
@@ -45,11 +41,9 @@ export async function getTelegramUserFromHeaders(headers: Headers) {
   ) as TelegramWebApps.WebAppUser;
 
   if (!webAppUser?.id) {
+    console.error("[telegram-auth] getTelegramUserFromHeaders: user payload is invalid");
     return null;
   }
-
-  console.error('[telegram-auth] Raw initData user:', data.user);
-  console.error('[telegram-auth] Parsed webAppUser:', JSON.stringify(webAppUser, null, 2));
 
   return checkOrCreateUser(webAppUser);
 }
@@ -162,10 +156,7 @@ async function checkOrCreateUser(webAppUser: TelegramWebApps.WebAppUser) {
     return null;
   }
 
-  // Логируем весь объект webAppUser для отладки (используем console.error чтобы точно попало в логи)
-  console.error('[telegram-auth] Full webAppUser object:', JSON.stringify(webAppUser, null, 2));
   const webAppUsername = (webAppUser as any).username as string | undefined;
-  console.error('[telegram-auth] webAppUser.username:', webAppUsername, 'type:', typeof webAppUsername);
 
   const telegramId = webAppUser.id.toString();
 
@@ -180,16 +171,10 @@ async function checkOrCreateUser(webAppUser: TelegramWebApps.WebAppUser) {
 
   // Если username нет в initData, получаем его через Bot API
   if (!username) {
-    console.error(`[telegram-auth] Username not in initData, fetching from Bot API for telegramId=${telegramId}`);
     username = await getUsernameFromBotAPI(telegramId);
-    if (username) {
-      console.error(`[telegram-auth] Got username from Bot API: ${username}`);
-    }
   }
 
   if (!user) {
-    console.error(`[telegram-auth] Creating user: telegramId=${telegramId}, username=${username}, webAppUser.username=${webAppUsername}`);
-    
     user = await db
       .insert(users)
       .values({
@@ -204,7 +189,6 @@ async function checkOrCreateUser(webAppUser: TelegramWebApps.WebAppUser) {
     // Обновляем username если он изменился или был добавлен
     // Обновляем только если username изменился
     if (user.username !== username) {
-      console.error(`[telegram-auth] Updating username: telegramId=${telegramId}, old=${user.username}, new=${username}`);
       await db
         .update(users)
         .set({ username })
