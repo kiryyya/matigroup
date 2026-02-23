@@ -16,7 +16,6 @@ type AuthFailReason =
   | "invalid_auth_date_format"
   | "expired_auth_date"
   | "future_auth_date"
-  | "replay_detected"
   | "invalid_user_payload";
 
 type ValidationResult = {
@@ -24,10 +23,7 @@ type ValidationResult = {
   reason?: AuthFailReason;
 };
 
-const replayCache = new Map<string, number>();
 const authFailCounters = new Map<AuthFailReason, number>();
-const REPLAY_CACHE_CLEANUP_INTERVAL_MS = 60_000;
-let lastReplayCleanupAt = 0;
 
 function recordAuthFail(reason: AuthFailReason, details?: Record<string, unknown>) {
   const nextCount = (authFailCounters.get(reason) ?? 0) + 1;
@@ -41,37 +37,6 @@ function recordAuthFail(reason: AuthFailReason, details?: Record<string, unknown
       ...details,
     }),
   );
-}
-
-function cleanupReplayCache(nowMs: number): void {
-  if (nowMs - lastReplayCleanupAt < REPLAY_CACHE_CLEANUP_INTERVAL_MS) {
-    return;
-  }
-
-  for (const [key, expiresAtMs] of replayCache.entries()) {
-    if (expiresAtMs <= nowMs) {
-      replayCache.delete(key);
-    }
-  }
-
-  lastReplayCleanupAt = nowMs;
-}
-
-function isReplayDetected(hash: string, authDate: string): boolean {
-  const nowMs = Date.now();
-  cleanupReplayCache(nowMs);
-
-  const replayKey = `${hash}:${authDate}`;
-  const existingExpiresAtMs = replayCache.get(replayKey);
-  if (existingExpiresAtMs && existingExpiresAtMs > nowMs) {
-    return true;
-  }
-
-  replayCache.set(
-    replayKey,
-    nowMs + env.TELEGRAM_INITDATA_TTL_SEC * 1000,
-  );
-  return false;
 }
 
 export async function getTelegramUserFromHeaders(headers: Headers) {
@@ -103,11 +68,6 @@ export async function getTelegramUserFromHeaders(headers: Headers) {
 
   if (!data.hash || !data.auth_date) {
     recordAuthFail("invalid_hash");
-    return null;
-  }
-
-  if (isReplayDetected(data.hash, data.auth_date)) {
-    recordAuthFail("replay_detected");
     return null;
   }
 
