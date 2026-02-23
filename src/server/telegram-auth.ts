@@ -6,6 +6,9 @@ import { users } from "~/server/db/schema";
 import { eq } from "drizzle-orm";
 import { bot } from "~/server/telegram";
 
+const TELEGRAM_INIT_DATA_TTL_SECONDS = 15 * 60;
+const TELEGRAM_INIT_DATA_FUTURE_SKEW_SECONDS = 30;
+
 export async function getTelegramUserFromHeaders(headers: Headers) {
   const initData = headers.get("x-telegram-init-data");
   console.error('[telegram-auth] getTelegramUserFromHeaders: initData present:', !!initData);
@@ -28,6 +31,12 @@ export async function getTelegramUserFromHeaders(headers: Headers) {
   console.error('[telegram-auth] getTelegramUserFromHeaders: hash valid:', isValid);
   if (!isValid) {
     console.error('[telegram-auth] getTelegramUserFromHeaders: hash validation failed');
+    return null;
+  }
+
+  const authDateIsValid = isAuthDateValid(data.auth_date);
+  if (!authDateIsValid) {
+    console.error("[telegram-auth] getTelegramUserFromHeaders: auth_date is expired or invalid");
     return null;
   }
 
@@ -94,6 +103,41 @@ function isHashValid(data: Record<string, string>, botToken: string) {
     console.error("[telegram-auth] isHashValid: invalid hash format");
     return false;
   }
+}
+
+function isAuthDateValid(authDate?: string): boolean {
+  if (!authDate) {
+    console.error("[telegram-auth] isAuthDateValid: missing auth_date");
+    return false;
+  }
+
+  const authDateSeconds = Number(authDate);
+  if (!Number.isFinite(authDateSeconds)) {
+    console.error("[telegram-auth] isAuthDateValid: invalid auth_date format");
+    return false;
+  }
+
+  const nowSeconds = Math.floor(Date.now() / 1000);
+  const ageSeconds = nowSeconds - authDateSeconds;
+
+  // Reject stale initData and values that are too far in the future.
+  if (ageSeconds > TELEGRAM_INIT_DATA_TTL_SECONDS) {
+    console.error("[telegram-auth] isAuthDateValid: auth_date TTL exceeded", {
+      ageSeconds,
+      ttlSeconds: TELEGRAM_INIT_DATA_TTL_SECONDS,
+    });
+    return false;
+  }
+
+  if (ageSeconds < -TELEGRAM_INIT_DATA_FUTURE_SKEW_SECONDS) {
+    console.error("[telegram-auth] isAuthDateValid: auth_date is too far in the future", {
+      ageSeconds,
+      allowedFutureSkewSeconds: TELEGRAM_INIT_DATA_FUTURE_SKEW_SECONDS,
+    });
+    return false;
+  }
+
+  return true;
 }
 
 /**
