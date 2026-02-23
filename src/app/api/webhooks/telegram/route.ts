@@ -113,29 +113,17 @@ ${payment.total_amount} ${payment.currency}
 });
 
 export const GET = async (req: Request) => {
-  const { searchParams } = new URL(req.url);
-  const setWebhook = searchParams.get("setWebhook");
-
-  if (setWebhook === "true") {
-    const webhookUrl = `${getBaseUrl()}/api/webhooks/telegram?secret_hash=${env.TELEGRAM_WEBHOOK_SECRET}`;
-    console.log("Setting webhook to", webhookUrl);
-    await bot.telegram.setWebhook(webhookUrl, {
-      drop_pending_updates: true,
-    });
-  }
-
-  const hookInfo = await bot.telegram.getWebhookInfo();
+  const { pathname } = new URL(req.url);
   return Response.json({
-    ...hookInfo,
-    url: hookInfo.url?.replace(env.TELEGRAM_WEBHOOK_SECRET, "SECRET_HASH"),
+    ok: true,
+    path: pathname,
+    message: "Telegram webhook endpoint is alive",
   });
 };
 
 export const POST = async (req: Request) => {
-  const { searchParams } = new URL(req.url);
-  const secretHash = searchParams.get("secret_hash");
-
-  if (secretHash !== env.TELEGRAM_WEBHOOK_SECRET) {
+  const secretToken = req.headers.get("x-telegram-bot-api-secret-token");
+  if (!secretToken || secretToken !== env.TELEGRAM_WEBHOOK_SECRET) {
     return new Response("Unauthorized", { status: 401 });
   }
 
