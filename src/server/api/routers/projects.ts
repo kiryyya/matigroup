@@ -1,5 +1,5 @@
 import { db } from "~/server/db";
-import { createTRPCRouter, procedure } from "../trpc";
+import { createTRPCRouter, procedure, publicProcedure } from "../trpc";
 import { z } from "zod";
 import { categories, projects, users } from "~/server/db/schema";
 import { eq, and, desc, lt } from "drizzle-orm";
@@ -129,14 +129,14 @@ function sanitizeProjectContent(content?: string | null): string | undefined {
 
 export const projectsRouter = createTRPCRouter({
   // Get all categories
-  categories: procedure.query(async () => {
+  categories: publicProcedure.query(async () => {
     return await db.query.categories.findMany({
       orderBy: [desc(categories.createdAt)],
     });
   }),
 
   // Get projects by category with pagination
-  projectsByCategory: procedure
+  projectsByCategory: publicProcedure
     .input(
       z.object({
         categorySlug: z.string(),
@@ -220,7 +220,7 @@ export const projectsRouter = createTRPCRouter({
     }),
 
   // Get single project
-  project: procedure
+  project: publicProcedure
     .input(z.object({ id: z.number() }))
     .query(async ({ input }) => {
       const project = await db.query.projects.findFirst({
@@ -276,7 +276,7 @@ export const projectsRouter = createTRPCRouter({
     }),
 
   // Get featured projects
-  featured: procedure.query(async () => {
+  featured: publicProcedure.query(async () => {
     const projectsData = await db.query.projects.findMany({
       where: and(
         eq(projects.featured, true),

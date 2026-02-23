@@ -1,4 +1,4 @@
-import { createTRPCRouter, procedure } from "../trpc";
+import { createTRPCRouter, procedure, publicProcedure } from "../trpc";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { db } from "~/server/db";
@@ -20,14 +20,14 @@ const updateCategorySchema = createCategorySchema.partial().extend({
 
 export const categoriesRouter = createTRPCRouter({
   // Получить все категории
-  getAll: procedure.query(async () => {
+  getAll: publicProcedure.query(async () => {
     return await db.query.categories.findMany({
       orderBy: [desc(categories.createdAt)],
     });
   }),
 
   // Получить категорию по ID
-  getById: procedure
+  getById: publicProcedure
     .input(z.object({ id: z.number() }))
     .query(async ({ input }) => {
       const category = await db.query.categories.findFirst({

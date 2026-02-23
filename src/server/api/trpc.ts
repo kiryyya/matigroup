@@ -28,9 +28,6 @@ import { getTelegramUserFromHeaders } from "~/server/telegram-auth";
  */
 export const createTRPCContext = async (opts: { headers: Headers }) => {
   const user = await getTelegramUserFromHeaders(opts.headers);
-  if (!user) {
-    throw new TRPCError({ code: "UNAUTHORIZED" });
-  }
 
   return {
     db,
@@ -81,6 +78,19 @@ export const createCallerFactory = t.createCallerFactory;
  */
 export const createTRPCRouter = t.router;
 
+const enforceAuthenticatedUser = t.middleware(({ ctx, next }) => {
+  if (!ctx.user) {
+    throw new TRPCError({ code: "UNAUTHORIZED" });
+  }
+
+  return next({
+    ctx: {
+      ...ctx,
+      user: ctx.user,
+    },
+  });
+});
+
 /**
  * Protected (authenticated) procedure
  *
@@ -89,4 +99,5 @@ export const createTRPCRouter = t.router;
  *
  * @see https://trpc.io/docs/procedures
  */
-export const procedure = t.procedure;
+export const publicProcedure = t.procedure;
+export const procedure = t.procedure.use(enforceAuthenticatedUser);
