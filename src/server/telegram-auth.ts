@@ -6,13 +6,78 @@ import { users } from "~/server/db/schema";
 import { eq } from "drizzle-orm";
 import { bot } from "~/server/telegram";
 
-const TELEGRAM_INIT_DATA_TTL_SECONDS = 15 * 60;
-const TELEGRAM_INIT_DATA_FUTURE_SKEW_SECONDS = 30;
+type AuthFailReason =
+  | "missing_init_data"
+  | "missing_bot_token"
+  | "missing_hash"
+  | "invalid_hash"
+  | "invalid_hash_format"
+  | "missing_auth_date"
+  | "invalid_auth_date_format"
+  | "expired_auth_date"
+  | "future_auth_date"
+  | "replay_detected"
+  | "invalid_user_payload";
+
+type ValidationResult = {
+  ok: boolean;
+  reason?: AuthFailReason;
+};
+
+const replayCache = new Map<string, number>();
+const authFailCounters = new Map<AuthFailReason, number>();
+const REPLAY_CACHE_CLEANUP_INTERVAL_MS = 60_000;
+let lastReplayCleanupAt = 0;
+
+function recordAuthFail(reason: AuthFailReason, details?: Record<string, unknown>) {
+  const nextCount = (authFailCounters.get(reason) ?? 0) + 1;
+  authFailCounters.set(reason, nextCount);
+
+  console.warn(
+    "[telegram-auth] auth_fail",
+    JSON.stringify({
+      reason,
+      count: nextCount,
+      ...details,
+    }),
+  );
+}
+
+function cleanupReplayCache(nowMs: number): void {
+  if (nowMs - lastReplayCleanupAt < REPLAY_CACHE_CLEANUP_INTERVAL_MS) {
+    return;
+  }
+
+  for (const [key, expiresAtMs] of replayCache.entries()) {
+    if (expiresAtMs <= nowMs) {
+      replayCache.delete(key);
+    }
+  }
+
+  lastReplayCleanupAt = nowMs;
+}
+
+function isReplayDetected(hash: string, authDate: string): boolean {
+  const nowMs = Date.now();
+  cleanupReplayCache(nowMs);
+
+  const replayKey = `${hash}:${authDate}`;
+  const existingExpiresAtMs = replayCache.get(replayKey);
+  if (existingExpiresAtMs && existingExpiresAtMs > nowMs) {
+    return true;
+  }
+
+  replayCache.set(
+    replayKey,
+    nowMs + env.TELEGRAM_INITDATA_TTL_SEC * 1000,
+  );
+  return false;
+}
 
 export async function getTelegramUserFromHeaders(headers: Headers) {
   const initData = headers.get("x-telegram-init-data");
   if (!initData) {
-    console.error("[telegram-auth] getTelegramUserFromHeaders: initData is missing");
+    recordAuthFail("missing_init_data");
     return null;
   }
 
@@ -20,28 +85,44 @@ export async function getTelegramUserFromHeaders(headers: Headers) {
   const data = Object.fromEntries(new URLSearchParams(initData));
   
   if (!env.TELEGRAM_BOT_TOKEN) {
-    console.error("[telegram-auth] getTelegramUserFromHeaders: TELEGRAM_BOT_TOKEN is missing");
+    recordAuthFail("missing_bot_token");
     return null;
   }
   
-  const isValid = isHashValid(data, env.TELEGRAM_BOT_TOKEN);
-  if (!isValid) {
-    console.error("[telegram-auth] getTelegramUserFromHeaders: hash validation failed");
+  const hashValidation = validateHash(data, env.TELEGRAM_BOT_TOKEN);
+  if (!hashValidation.ok) {
+    recordAuthFail(hashValidation.reason ?? "invalid_hash");
     return null;
   }
 
-  const authDateIsValid = isAuthDateValid(data.auth_date);
-  if (!authDateIsValid) {
-    console.error("[telegram-auth] getTelegramUserFromHeaders: auth_date is expired or invalid");
+  const authDateValidation = validateAuthDate(data.auth_date);
+  if (!authDateValidation.ok) {
+    recordAuthFail(authDateValidation.reason ?? "invalid_auth_date_format");
     return null;
   }
 
-  const webAppUser = JSON.parse(
-    data.user ?? "null",
-  ) as TelegramWebApps.WebAppUser;
+  if (!data.hash || !data.auth_date) {
+    recordAuthFail("invalid_hash");
+    return null;
+  }
+
+  if (isReplayDetected(data.hash, data.auth_date)) {
+    recordAuthFail("replay_detected");
+    return null;
+  }
+
+  let webAppUser: TelegramWebApps.WebAppUser | null = null;
+  try {
+    webAppUser = JSON.parse(
+      data.user ?? "null",
+    ) as TelegramWebApps.WebAppUser;
+  } catch {
+    recordAuthFail("invalid_user_payload");
+    return null;
+  }
 
   if (!webAppUser?.id) {
-    console.error("[telegram-auth] getTelegramUserFromHeaders: user payload is invalid");
+    recordAuthFail("invalid_user_payload");
     return null;
   }
 
@@ -64,10 +145,9 @@ export async function requireTelegramAdmin(headers: Headers) {
   return user;
 }
 
-function isHashValid(data: Record<string, string>, botToken: string) {
+function validateHash(data: Record<string, string>, botToken: string): ValidationResult {
   if (!data.hash) {
-    console.error("[telegram-auth] isHashValid: missing hash in initData");
-    return false;
+    return { ok: false, reason: "missing_hash" };
   }
 
   // Для Telegram WebApp hash в checkString исключается только поле hash.
@@ -89,49 +169,39 @@ function isHashValid(data: Record<string, string>, botToken: string) {
   const calculatedHash = calculatedHashHex.toLowerCase();
 
   try {
-    return timingSafeEqual(
+    const isMatch = timingSafeEqual(
       Buffer.from(calculatedHash, "hex"),
       Buffer.from(providedHash, "hex"),
     );
+    return isMatch ? { ok: true } : { ok: false, reason: "invalid_hash" };
   } catch {
-    console.error("[telegram-auth] isHashValid: invalid hash format");
-    return false;
+    return { ok: false, reason: "invalid_hash_format" };
   }
 }
 
-function isAuthDateValid(authDate?: string): boolean {
+function validateAuthDate(authDate?: string): ValidationResult {
   if (!authDate) {
-    console.error("[telegram-auth] isAuthDateValid: missing auth_date");
-    return false;
+    return { ok: false, reason: "missing_auth_date" };
   }
 
   const authDateSeconds = Number(authDate);
   if (!Number.isFinite(authDateSeconds)) {
-    console.error("[telegram-auth] isAuthDateValid: invalid auth_date format");
-    return false;
+    return { ok: false, reason: "invalid_auth_date_format" };
   }
 
   const nowSeconds = Math.floor(Date.now() / 1000);
   const ageSeconds = nowSeconds - authDateSeconds;
 
   // Reject stale initData and values that are too far in the future.
-  if (ageSeconds > TELEGRAM_INIT_DATA_TTL_SECONDS) {
-    console.error("[telegram-auth] isAuthDateValid: auth_date TTL exceeded", {
-      ageSeconds,
-      ttlSeconds: TELEGRAM_INIT_DATA_TTL_SECONDS,
-    });
-    return false;
+  if (ageSeconds > env.TELEGRAM_INITDATA_TTL_SEC) {
+    return { ok: false, reason: "expired_auth_date" };
   }
 
-  if (ageSeconds < -TELEGRAM_INIT_DATA_FUTURE_SKEW_SECONDS) {
-    console.error("[telegram-auth] isAuthDateValid: auth_date is too far in the future", {
-      ageSeconds,
-      allowedFutureSkewSeconds: TELEGRAM_INIT_DATA_FUTURE_SKEW_SECONDS,
-    });
-    return false;
+  if (ageSeconds < -env.TELEGRAM_INITDATA_SKEW_SEC) {
+    return { ok: false, reason: "future_auth_date" };
   }
 
-  return true;
+  return { ok: true };
 }
 
 /**

@@ -195,21 +195,6 @@ export default function HomeClient() {
           ) : (
             <div className="text-center text-muted-foreground py-10 space-y-2">
               <div>Категории пока не добавлены</div>
-              <div className="text-sm mt-4 p-4 bg-muted rounded-lg">
-                <div className="font-semibold">Отладочная информация:</div>
-                <div>isLoadingUser: {isLoadingUser ? "true" : "false"}</div>
-                <div>Telegram WebApp: {typeof window !== "undefined" && window.Telegram?.WebApp ? "доступен" : "не доступен"}</div>
-                <div>initData: {typeof window !== "undefined" && window.Telegram?.WebApp?.initData ? "есть" : "нет"}</div>
-                <div>user: {user ? JSON.stringify({ id: user.id, name: user.name, telegramId: user.telegramId, role: user.role, username: user.username }) : "null"}</div>
-                <div>userError: {userError ? `${userError.message} (code: ${userError.data?.code || 'unknown'})` : "нет ошибки"}</div>
-                {user && (
-                  <>
-                    <div className="font-semibold mt-2">Информация о пользователе:</div>
-                    <div>Username: {user.username ?? "не указан"}</div>
-                    <div>Role: {user.role ?? "не указана"}</div>
-                  </>
-                )}
-              </div>
             </div>
           )}
         </div>
