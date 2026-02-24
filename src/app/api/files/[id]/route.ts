@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "~/server/db";
 import { projects } from "~/server/db/schema";
 import { and, eq } from "drizzle-orm";
-import { addWatermarkToFile } from "~/lib/watermark";
 import { getPrivateObject } from "~/lib/storage";
 import { requireTelegramUser } from "~/server/telegram-auth";
 import { validateCSRF } from "~/lib/csrf";
@@ -10,9 +9,12 @@ import { checkRateLimit, getClientIp } from "~/lib/rate-limit";
 
 // Force dynamic rendering - don't execute during build
 export const dynamic = 'force-dynamic';
+export const runtime = "nodejs";
 
 interface RouteParams {
-  params: {
+  params: Promise<{
+    id: string;
+  }> | {
     id: string;
   };
 }
@@ -22,6 +24,7 @@ export async function GET(
   { params }: RouteParams
 ) {
   try {
+    const resolvedParams = params instanceof Promise ? await params : params;
     const ip = getClientIp(request.headers);
     const rateLimitResult = checkRateLimit(`files:${ip}`, {
       windowMs: 60_000,
@@ -59,7 +62,7 @@ export async function GET(
       );
     }
     
-    const projectId = parseInt(params.id);
+    const projectId = parseInt(resolvedParams.id);
     const attachmentIdx = parseInt(attachmentIndex);
     
     if (isNaN(projectId) || isNaN(attachmentIdx)) {
@@ -142,21 +145,23 @@ export async function GET(
       const bodyBuffer = Buffer.from(await s3Object.Body.transformToByteArray());
       let finalBuffer: Buffer = bodyBuffer;
 
-    if (withWatermark) {
-      try {
+      if (withWatermark) {
+        try {
+          // Lazy import: avoid loading heavy watermark dependencies for normal downloads.
+          const { addWatermarkToFile } = await import("~/lib/watermark");
           const watermarked = await addWatermarkToFile(bodyBuffer, mimeType, {
             text: "123",
-          opacity: 0.5,
-          fontSize: 16,
-        });
-          finalBuffer = Buffer.isBuffer(watermarked) 
-            ? watermarked 
+            opacity: 0.5,
+            fontSize: 16,
+          });
+          finalBuffer = Buffer.isBuffer(watermarked)
+            ? watermarked
             : Buffer.from(watermarked);
-      } catch (error) {
+        } catch (error) {
           console.error("Ошибка при добавлении водяного знака:", error);
           finalBuffer = bodyBuffer;
         }
-    }
+      }
     
     return new NextResponse(finalBuffer as BodyInit, {
       status: 200,
