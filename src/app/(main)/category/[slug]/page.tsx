@@ -11,6 +11,7 @@ import FilterModal, { type FilterOptions } from "~/components/filter-modal";
 import FavoriteButton from "~/components/favorite-button";
 import Loader from "~/components/ui/loader";
 import { useState, useMemo, useEffect, useRef } from "react";
+import type { StoredImage } from "~/types/files";
 
 interface CategoryPageProps {
   params: {
@@ -155,6 +156,20 @@ export default function CategoryPage({ params }: CategoryPageProps) {
     setFilters(prev => ({ ...prev, searchQuery: '' }));
   };
 
+  const buildImageProxyUrl = (key: string) =>
+    `/api/images/${encodeURI(key)}?v=desktop-cache-bust-2`;
+
+  const getPreviewKey = (key: string) => {
+    if (key.includes("-original-")) return key.replace("-original-", "-preview-");
+    if (key.includes("original")) return key.replace("original", "preview");
+    return key;
+  };
+
+  const getImageSrc = (image: StoredImage, preferPreview = true) => {
+    const key = preferPreview ? getPreviewKey(image.key) : image.key;
+    return buildImageProxyUrl(key);
+  };
+
 
   if (isLoading) {
     return (
@@ -207,13 +222,19 @@ export default function CategoryPage({ params }: CategoryPageProps) {
                       {/* Фоновое изображение */}
                       <div className="absolute inset-0 z-0">
                         <img
-                          src={project.images?.[0]?.previewUrl ?? project.images?.[0]?.url ?? ''}
+                          src={getImageSrc(project.images?.[0] as StoredImage, true)}
                           alt={project.title}
                           className="h-full w-full object-cover"
                           loading="lazy"
                           decoding="async"
                           onError={(e) => {
                             const target = e.target as HTMLImageElement;
+                            const image = project.images?.[0] as StoredImage;
+                            if (target.dataset.originalTried !== "1" && image?.key) {
+                              target.dataset.originalTried = "1";
+                              target.src = getImageSrc(image, false);
+                              return;
+                            }
                             target.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAwIiBoZWlnaHQ9IjMwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjZjNmNGY2Ii8+PHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtZmFtaWx5PSJBcmlhbCIgZm9udC1zaXplPSIxNCIgZmlsbD0iIzY2NjY2NiIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZHk9Ii4zZW0iPlByZXZpZXc8L3RleHQ+PC9zdmc+';
                           }}
                         />

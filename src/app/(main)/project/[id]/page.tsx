@@ -323,6 +323,20 @@ export default function ProjectPage({ params }: ProjectPageProps) {
     setCurrentImageIndex((prev) => (prev - 1 + (displayProject.images?.length ?? 1)) % (displayProject.images?.length ?? 1));
   };
 
+  const buildImageProxyUrl = (key: string) =>
+    `/api/images/${encodeURI(key)}?v=desktop-cache-bust-2`;
+
+  const getPreviewKey = (key: string) => {
+    if (key.includes("-original-")) return key.replace("-original-", "-preview-");
+    if (key.includes("original")) return key.replace("original", "preview");
+    return key;
+  };
+
+  const getImageSrc = (image: StoredImage, preferPreview = true) => {
+    const key = preferPreview ? getPreviewKey(image.key) : image.key;
+    return buildImageProxyUrl(key);
+  };
+
   return (
     <>
       <div className="flex flex-col md:flex-row gap-6 min-h-[calc(100vh-12rem)] pb-52">
@@ -333,7 +347,7 @@ export default function ProjectPage({ params }: ProjectPageProps) {
               {/* Основное изображение */}
               <img
                 key={`${displayProject.id}-${currentImageIndex}`}
-                src={(displayProject.images[currentImageIndex] as StoredImage).url}
+                src={getImageSrc(displayProject.images[currentImageIndex] as StoredImage, true)}
                 alt={`${displayProject.title} - изображение ${currentImageIndex + 1}`}
                 className="w-full h-full object-cover"
                 loading="eager"
@@ -346,6 +360,12 @@ export default function ProjectPage({ params }: ProjectPageProps) {
                 style={{ opacity: 0, transition: 'opacity 0.2s' }}
                 onError={(e) => {
                   const target = e.target as HTMLImageElement;
+                  const image = displayProject.images[currentImageIndex] as StoredImage;
+                  if (target.dataset.originalTried !== "1") {
+                    target.dataset.originalTried = "1";
+                    target.src = getImageSrc(image, false);
+                    return;
+                  }
                   target.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAwIiBoZWlnaHQ9IjMwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjZjNmNGY2Ii8+PHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtZmFtaWx5PSJBcmlhbCIgZm9udC1zaXplPSIxNCIgZmlsbD0iIzY2NjY2NiIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZHk9Ii4zZW0iPkltYWdlPC90ZXh0Pjwvc3ZnPg==';
                   target.style.opacity = '1';
                 }}

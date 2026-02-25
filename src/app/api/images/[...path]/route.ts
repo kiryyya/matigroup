@@ -22,7 +22,11 @@ function normalizeImageMimeType(contentType?: string): string | null {
     return null;
   }
 
-  const mimeType = contentType.split(";")[0]?.trim().toLowerCase();
+  const rawMimeType = contentType.split(";")[0]?.trim().toLowerCase();
+  const mimeType =
+    rawMimeType === "image/jpg" || rawMimeType === "image/pjpeg"
+      ? "image/jpeg"
+      : rawMimeType;
   if (!mimeType) {
     return null;
   }
@@ -30,16 +34,54 @@ function normalizeImageMimeType(contentType?: string): string | null {
   return ALLOWED_IMAGE_MIME_TYPES.has(mimeType) ? mimeType : null;
 }
 
-function buildImageResponse(bodyBuffer: Buffer, contentType: string) {
+function buildImageResponse(
+  bodyBuffer: Buffer,
+  contentType: string,
+  cacheControl = "no-store",
+) {
   return new NextResponse(bodyBuffer, {
     status: 200,
     headers: {
       "Content-Type": contentType,
-      "Cache-Control": "public, max-age=31536000, immutable",
+      "Cache-Control": cacheControl,
       "Content-Length": bodyBuffer.length.toString(),
       "X-Content-Type-Options": "nosniff",
+      "Content-Disposition": "inline",
     },
   });
+}
+
+async function convertToJpeg(bodyBuffer: Buffer): Promise<Buffer | null> {
+  try {
+    const sharp = (await import("sharp")).default;
+    return await sharp(bodyBuffer).jpeg({ quality: 82 }).toBuffer();
+  } catch {
+    return null;
+  }
+}
+
+async function resolveImagePayload(s3Object: Awaited<ReturnType<typeof getPublicObject>>) {
+  if (!s3Object.Body) {
+    throw new Error("File not found");
+  }
+
+  let bodyBuffer = Buffer.from(await s3Object.Body.transformToByteArray());
+  let contentType = normalizeImageMimeType(s3Object.ContentType);
+
+  // Telegram Desktop can fail on some WebP/AVIF cases; fallback to JPEG.
+  if (!contentType || contentType === "image/webp" || contentType === "image/avif") {
+    const converted = await convertToJpeg(bodyBuffer);
+    if (converted) {
+      bodyBuffer = converted;
+      contentType = "image/jpeg";
+    }
+  }
+
+  if (!contentType) {
+    return null;
+  }
+
+  return { bodyBuffer, contentType };
 }
 
 export async function GET(
@@ -60,22 +102,15 @@ export async function GET(
       // Пытаемся получить файл из хранилища
       const s3Object = await getPublicObject({ key });
       
-      if (!s3Object.Body) {
-        throw new Error("File not found");
-      }
-
-      // Преобразуем тело в буфер
-      const bodyBuffer = Buffer.from(await s3Object.Body.transformToByteArray());
-
-      const contentType = normalizeImageMimeType(s3Object.ContentType);
-      if (!contentType) {
+      const payload = await resolveImagePayload(s3Object);
+      if (!payload) {
         return NextResponse.json(
           { error: "Unsupported image content type" },
           { status: 415, headers: { "X-Content-Type-Options": "nosniff" } },
         );
       }
 
-      return buildImageResponse(bodyBuffer, contentType);
+      return buildImageResponse(payload.bodyBuffer, payload.contentType);
     } catch (s3Error: unknown) {
       // Если это preview и файл не найден, пытаемся загрузить original
       if (key.includes('-preview-')) {
@@ -84,16 +119,15 @@ export async function GET(
           const s3Object = await getPublicObject({ key: originalKey });
           
           if (s3Object.Body) {
-            const bodyBuffer = Buffer.from(await s3Object.Body.transformToByteArray());
-            const contentType = normalizeImageMimeType(s3Object.ContentType);
-            if (!contentType) {
+            const payload = await resolveImagePayload(s3Object);
+            if (!payload) {
               return NextResponse.json(
                 { error: "Unsupported image content type" },
                 { status: 415, headers: { "X-Content-Type-Options": "nosniff" } },
               );
             }
 
-            return buildImageResponse(bodyBuffer, contentType);
+            return buildImageResponse(payload.bodyBuffer, payload.contentType);
           }
         } catch (originalError) {
           // Если и original не найден, возвращаем ошибку
