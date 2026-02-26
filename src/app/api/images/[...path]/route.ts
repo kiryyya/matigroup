@@ -37,19 +37,25 @@ function normalizeImageMimeType(contentType?: string): string | null {
 function buildImageResponse(
   bodyBuffer: Buffer,
   contentType: string,
-  cacheControl = "no-store",
 ) {
   return new NextResponse(bodyBuffer, {
     status: 200,
     headers: {
       "Content-Type": contentType,
-      "Cache-Control": cacheControl,
+      // Cache successful image responses to avoid repeated S3/proxy hops.
+      "Cache-Control": "public, max-age=86400, s-maxage=86400, stale-while-revalidate=604800",
       "Content-Length": bodyBuffer.length.toString(),
       "X-Content-Type-Options": "nosniff",
       "Content-Disposition": "inline",
     },
   });
 }
+
+const NO_STORE_HEADERS = {
+  "Cache-Control": "no-store, max-age=0, must-revalidate",
+  Pragma: "no-cache",
+  Expires: "0",
+} as const;
 
 async function convertToJpeg(bodyBuffer: Buffer): Promise<Buffer | null> {
   try {
@@ -106,7 +112,13 @@ export async function GET(
       if (!payload) {
         return NextResponse.json(
           { error: "Unsupported image content type" },
-          { status: 415, headers: { "X-Content-Type-Options": "nosniff" } },
+          {
+            status: 415,
+            headers: {
+              ...NO_STORE_HEADERS,
+              "X-Content-Type-Options": "nosniff",
+            },
+          },
         );
       }
 
@@ -123,7 +135,13 @@ export async function GET(
             if (!payload) {
               return NextResponse.json(
                 { error: "Unsupported image content type" },
-                { status: 415, headers: { "X-Content-Type-Options": "nosniff" } },
+                {
+                  status: 415,
+                  headers: {
+                    ...NO_STORE_HEADERS,
+                    "X-Content-Type-Options": "nosniff",
+                  },
+                },
               );
             }
 
@@ -138,11 +156,17 @@ export async function GET(
       // Если не удалось загрузить, возвращаем ошибку
       console.error("Error fetching image:", s3Error);
       const message = s3Error instanceof Error ? s3Error.message : "Internal server error";
-      return NextResponse.json({ error: message }, { status: 404 });
+      return NextResponse.json(
+        { error: message },
+        { status: 404, headers: NO_STORE_HEADERS },
+      );
     }
   } catch (error) {
     console.error("Error in image proxy:", error);
     const message = error instanceof Error ? error.message : "Internal server error";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return NextResponse.json(
+      { error: message },
+      { status: 500, headers: NO_STORE_HEADERS },
+    );
   }
 }

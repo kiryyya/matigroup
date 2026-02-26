@@ -173,10 +173,10 @@ export default function CategoryPage({ params }: CategoryPageProps) {
 
   const getImageCandidates = (image: StoredImage) => {
     const candidates = [
-      image?.key ? buildImageProxyUrl(getPreviewKey(image.key)) : "",
-      image?.key ? buildImageProxyUrl(image.key) : "",
       image?.previewUrl ?? "",
       image?.url ?? "",
+      image?.key ? buildImageProxyUrl(image.key) : "",
+      image?.key ? buildImageProxyUrl(getPreviewKey(image.key)) : "",
     ].filter(Boolean);
 
     return [...new Set(candidates)];
