@@ -61,19 +61,55 @@ set_kv() {
 
 echo "Preparing deploy: image=${next_image}, version=${APP_VERSION}"
 
-# Очищаем место ПЕРЕД деплоем, чтобы избежать ошибок "no space left on device"
-echo "Cleaning up old Docker images to free space before deploy..."
-# Общая очистка неиспользуемых ресурсов (осторожно, не удаляет используемые)
-docker system prune -f --filter "until=24h" || true
-# Удаляем неиспользуемые образы, оставляя только последние 2 версии
-docker images --format "{{.Repository}}:{{.Tag}}" | grep "${next_image%%:*}" | grep -v "${APP_VERSION}" | tail -n +3 | xargs -r docker rmi -f || true
+print_disk_state() {
+  echo "=== Disk usage ==="
+  df -h || true
+  docker system df || true
+}
+
+cleanup_light() {
+  echo "Running light Docker cleanup..."
+  docker image prune -f || true
+  docker builder prune -f || true
+}
+
+cleanup_aggressive() {
+  echo "Running aggressive Docker cleanup..."
+  docker compose --env-file "$ENV_DEPLOY_FILE" rm -sf app || true
+  docker container prune -f || true
+  docker image prune -af || true
+  docker builder prune -af || true
+  docker volume prune -f || true
+  docker system prune -af --volumes || true
+}
+
+retry_with_cleanup() {
+  cmd="$1"
+  max_attempts="${2:-3}"
+  attempt=1
+  while [ "$attempt" -le "$max_attempts" ]; do
+    echo "Attempt ${attempt}/${max_attempts}: ${cmd}"
+    if eval "$cmd"; then
+      return 0
+    fi
+
+    echo "Command failed: ${cmd}"
+    print_disk_state
+    cleanup_aggressive
+    attempt=$((attempt + 1))
+  done
+  return 1
+}
+
+print_disk_state
+cleanup_light
 
 set_kv "APP_IMAGE" "$next_image" "$ENV_DEPLOY_FILE"
 set_kv "APP_VERSION" "$APP_VERSION" "$ENV_DEPLOY_FILE"
 
 echo "Pulling and starting new version..."
-docker compose --env-file "$ENV_DEPLOY_FILE" pull app
-docker compose --env-file "$ENV_DEPLOY_FILE" up -d app
+retry_with_cleanup "docker compose --env-file \"$ENV_DEPLOY_FILE\" pull app" 3
+retry_with_cleanup "docker compose --env-file \"$ENV_DEPLOY_FILE\" up -d app" 3
 
 echo "Waiting for healthcheck..."
 deadline=$((SECONDS + HEALTH_WAIT_SECONDS))
@@ -91,6 +127,12 @@ done
 if [ "$healthy" -eq 1 ]; then
   echo "$APP_VERSION" > "$STATE_FILE"
   echo "Deploy success: ${APP_VERSION}"
+  # Keep current version and latest; remove older tags for this repo.
+  docker images "${next_image%%:*}" --format "{{.Tag}}" \
+    | grep -Ev "^(${APP_VERSION}|latest)$" \
+    | xargs -r -I{} docker rmi -f "${next_image%%:*}:{}" || true
+  cleanup_light
+  print_disk_state
   docker compose --env-file "$ENV_DEPLOY_FILE" ps
   exit 0
 fi

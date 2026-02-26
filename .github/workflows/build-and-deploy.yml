@@ -71,6 +71,17 @@ jobs:
             fi
 
             cd "$DEPLOY_PATH"
+            echo "Pre-deploy cleanup to avoid 'no space left on device'..."
+            df -h || true
+            docker system df || true
+            docker compose rm -sf app || true
+            docker container prune -f || true
+            docker image prune -af || true
+            docker builder prune -af || true
+            docker volume prune -f || true
+            docker system prune -af --volumes || true
+            df -h || true
+            docker system df || true
             
             chmod +x scripts/deploy.sh scripts/rollback.sh
             ./scripts/deploy.sh "${{ needs.build-and-push.outputs.image_version }}" "${{ needs.build-and-push.outputs.image_name }}"
