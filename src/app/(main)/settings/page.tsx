@@ -4,7 +4,7 @@ import { api } from "~/trpc/react";
 import { Card, CardContent } from "~/components/ui/card";
 import Loader from "~/components/ui/loader";
 import Link from "next/link";
-import { Search, Plus, Image as ImageIcon, ChevronRight, Folder } from "lucide-react";
+import { Search, Plus, Image as ImageIcon, ChevronRight, Folder, Bug } from "lucide-react";
 
 export default function Settings() {
   const { data: user, isLoading } = api.tg.getUser.useQuery();
@@ -44,6 +44,13 @@ export default function Settings() {
       description: "Настройте параметры водяного знака для изображений",
       href: "/settings/watermark",
       icon: ImageIcon,
+      adminOnly: true,
+    },
+    {
+      title: "Диагностика изображений",
+      description: "Проверка key в S3 и поведения /api/images без DevTools",
+      href: "/settings/image-debug",
+      icon: Bug,
       adminOnly: true,
     },
   ].filter(item => !item.adminOnly || user?.role === "admin");
