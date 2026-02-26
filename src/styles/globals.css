@@ -69,6 +69,10 @@
 }
 
 @layer utilities {
+  .tg-mobile-top-offset {
+    margin-top: 6rem;
+  }
+
   .scrollbar-hide {
     /* Hide scrollbar for Chrome, Safari and Opera */
     -ms-overflow-style: none; /* IE and Edge */

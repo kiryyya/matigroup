@@ -43,7 +43,7 @@ export default async function RootLayout({
       </head>
       <body
         className={cn(
-          "h-screen bg-background font-sans antialiased overflow-hidden mt-24 md:mt-0",
+          "h-screen bg-background font-sans antialiased overflow-hidden",
           fontSans.variable,
         )}
       >

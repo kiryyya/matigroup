@@ -18,10 +18,20 @@ export default function TelegramWebAppInit() {
   }, []);
 
   useEffect(() => {
+    if (typeof window === "undefined") return;
+
     // Проверяем, что мы в Telegram Web App
-    if (typeof window !== "undefined" && window.Telegram?.WebApp) {
+    if (window.Telegram?.WebApp) {
       const tg = window.Telegram.WebApp;
+      const body = window.document.body;
       const isDesktopTelegram = tg.platform === "tdesktop" || tg.platform === "macos";
+
+      // Верхний отступ нужен только в мобильном Telegram-клиенте.
+      if (isDesktopTelegram) {
+        body.classList.remove("tg-mobile-top-offset");
+      } else {
+        body.classList.add("tg-mobile-top-offset");
+      }
       
       // На десктопе фиксируем текущий размер и не разрешаем автоматическое "раздувание".
       if (!isDesktopTelegram) {
@@ -102,12 +112,17 @@ export default function TelegramWebAppInit() {
         window.addEventListener("keydown", onKeyDown);
 
         return () => {
+          body.classList.remove("tg-mobile-top-offset");
           window.removeEventListener("wheel", onWheel);
           window.removeEventListener("keydown", onKeyDown);
         };
       }
 
       console.log("Telegram Web App initialized");
+
+      return () => {
+        body.classList.remove("tg-mobile-top-offset");
+      };
     }
   }, []);
 
