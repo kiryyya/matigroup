@@ -10,8 +10,14 @@ import { useState, useEffect, useRef, useMemo } from "react";
 import type { StoredImage } from "~/types/files";
 
 export default function FavoritesPage() {
+  const encodeStorageKey = (key: string) =>
+    key
+      .split("/")
+      .map((segment) => encodeURIComponent(segment))
+      .join("/");
+
   const buildImageProxyUrl = (key: string) =>
-    `/api/images/${encodeURI(key)}?v=desktop-cache-bust-2`;
+    `/api/images/${encodeStorageKey(key)}?v=desktop-cache-bust-3`;
 
   const getPreviewKey = (key: string) => {
     if (key.includes("-original-")) return key.replace("-original-", "-preview-");
@@ -19,9 +25,15 @@ export default function FavoritesPage() {
     return key;
   };
 
-  const getImageSrc = (image: StoredImage, preferPreview = true) => {
-    const key = preferPreview ? getPreviewKey(image.key) : image.key;
-    return buildImageProxyUrl(key);
+  const getImageCandidates = (image: StoredImage) => {
+    const candidates = [
+      image?.key ? buildImageProxyUrl(getPreviewKey(image.key)) : "",
+      image?.key ? buildImageProxyUrl(image.key) : "",
+      image?.previewUrl ?? "",
+      image?.url ?? "",
+    ].filter(Boolean);
+
+    return [...new Set(candidates)];
   };
 
   const {
@@ -189,7 +201,7 @@ export default function FavoritesPage() {
                 <CardContent>
                   <div className="relative h-48 w-full rounded-lg overflow-hidden">
                     <img
-                      src={getImageSrc(project.images[0] as StoredImage, true)}
+                      src={getImageCandidates(project.images[0] as StoredImage)[0] ?? ""}
                       alt={project.title}
                       className="h-full w-full object-cover"
                       loading="lazy"
@@ -197,9 +209,12 @@ export default function FavoritesPage() {
                       onError={(e) => {
                         const target = e.target as HTMLImageElement;
                         const image = project.images[0] as StoredImage;
-                        if (target.dataset.originalTried !== "1" && image?.key) {
-                          target.dataset.originalTried = "1";
-                          target.src = getImageSrc(image, false);
+                        const candidates = getImageCandidates(image);
+                        const fallbackIndex = Number(target.dataset.fallbackIndex ?? "0");
+                        const nextSrc = candidates[fallbackIndex + 1];
+                        if (nextSrc) {
+                          target.dataset.fallbackIndex = String(fallbackIndex + 1);
+                          target.src = nextSrc;
                           return;
                         }
                         target.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAwIiBoZWlnaHQ9IjMwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjZjNmNGY2Ii8+PHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtZmFtaWx5PSJBcmlhbCIgZm9udC1zaXplPSIxNCIgZmlsbD0iIzY2NjY2NiIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZHk9Ii4zZW0iPkltYWdlPC90ZXh0Pjwvc3ZnPg==';
