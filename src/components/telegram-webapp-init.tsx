@@ -8,6 +8,8 @@ const getMethod = (obj: unknown, key: string) => {
   return typeof value === "function" ? value : null;
 };
 
+const MOBILE_TELEGRAM_PLATFORMS = new Set(["android", "ios"]);
+
 /**
  * Компонент для инициализации Telegram Web App с нужными настройками
  * Предотвращает закрытие приложения при скролле вниз
@@ -24,17 +26,19 @@ export default function TelegramWebAppInit() {
     if (window.Telegram?.WebApp) {
       const tg = window.Telegram.WebApp;
       const body = window.document.body;
-      const isDesktopTelegram = tg.platform === "tdesktop" || tg.platform === "macos";
+      const platform = tg.platform;
+      const isMobileTelegram = MOBILE_TELEGRAM_PLATFORMS.has(platform);
+      const isDesktopTelegram = !isMobileTelegram;
 
       // Верхний отступ нужен только в мобильном Telegram-клиенте.
-      if (isDesktopTelegram) {
-        body.classList.remove("tg-mobile-top-offset");
-      } else {
+      if (isMobileTelegram) {
         body.classList.add("tg-mobile-top-offset");
+      } else {
+        body.classList.remove("tg-mobile-top-offset");
       }
       
-      // На десктопе фиксируем текущий размер и не разрешаем автоматическое "раздувание".
-      if (!isDesktopTelegram) {
+      // На мобильных клиентах расширяем WebApp.
+      if (isMobileTelegram) {
         try {
           tg.expand();
         } catch (error) {
@@ -43,7 +47,7 @@ export default function TelegramWebAppInit() {
       }
       
       // Полноэкранный режим оставляем только для мобильных клиентов.
-      if (!isDesktopTelegram) {
+      if (isMobileTelegram) {
         const requestFullscreen = getMethod(tg, "requestFullscreen") as (() => void) | null;
         if (requestFullscreen) {
           try {
