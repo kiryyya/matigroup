@@ -21,21 +21,26 @@ export default function TelegramWebAppInit() {
     // Проверяем, что мы в Telegram Web App
     if (typeof window !== "undefined" && window.Telegram?.WebApp) {
       const tg = window.Telegram.WebApp;
+      const isDesktopTelegram = tg.platform === "tdesktop" || tg.platform === "macos";
       
-      // Расширяем viewport на весь экран
-      try {
-      tg.expand();
-      } catch (error) {
-        console.warn("Telegram WebApp expand failed:", error);
+      // На десктопе фиксируем текущий размер и не разрешаем автоматическое "раздувание".
+      if (!isDesktopTelegram) {
+        try {
+          tg.expand();
+        } catch (error) {
+          console.warn("Telegram WebApp expand failed:", error);
+        }
       }
       
-      // Запрашиваем полноэкранный режим (с проверкой типов)
-      const requestFullscreen = getMethod(tg, "requestFullscreen") as (() => void) | null;
-      if (requestFullscreen) {
-        try {
-          requestFullscreen();
-        } catch (error) {
-          console.warn("Telegram WebApp fullscreen not supported:", error);
+      // Полноэкранный режим оставляем только для мобильных клиентов.
+      if (!isDesktopTelegram) {
+        const requestFullscreen = getMethod(tg, "requestFullscreen") as (() => void) | null;
+        if (requestFullscreen) {
+          try {
+            requestFullscreen();
+          } catch (error) {
+            console.warn("Telegram WebApp fullscreen not supported:", error);
+          }
         }
       }
       
@@ -76,7 +81,33 @@ export default function TelegramWebAppInit() {
         }
       }
       
-      console.log("Telegram Web App initialized with fullscreen and disabled vertical swipes");
+      // Блокируем browser-zoom только для Telegram Desktop.
+      if (isDesktopTelegram) {
+        const onWheel = (event: WheelEvent) => {
+          if (event.ctrlKey || event.metaKey) {
+            event.preventDefault();
+          }
+        };
+
+        const onKeyDown = (event: KeyboardEvent) => {
+          const isZoomShortcut =
+            (event.ctrlKey || event.metaKey) &&
+            (event.key === "+" || event.key === "-" || event.key === "=" || event.key === "0");
+          if (isZoomShortcut) {
+            event.preventDefault();
+          }
+        };
+
+        window.addEventListener("wheel", onWheel, { passive: false });
+        window.addEventListener("keydown", onKeyDown);
+
+        return () => {
+          window.removeEventListener("wheel", onWheel);
+          window.removeEventListener("keydown", onKeyDown);
+        };
+      }
+
+      console.log("Telegram Web App initialized");
     }
   }, []);
 
