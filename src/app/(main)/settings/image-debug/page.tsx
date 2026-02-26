@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import { Input } from "~/components/ui/input";
 import { Button } from "~/components/ui/button";
 import Loader from "~/components/ui/loader";
+import type { StoredImage } from "~/types/files";
 
 type DebugResponse = {
   key: string;
@@ -33,12 +34,27 @@ function normalizeInputToKey(value: string) {
 
 export default function ImageDebugPage() {
   const { data: user, isLoading } = api.tg.getUser.useQuery();
+  const { data: allProjects, isLoading: isProjectsLoading } =
+    api.projects.allProjects.useQuery(undefined, {
+      enabled: user?.role === "admin",
+      refetchOnWindowFocus: false,
+    });
   const [input, setInput] = useState("");
   const [isChecking, setIsChecking] = useState(false);
   const [result, setResult] = useState<DebugResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const preparedKey = useMemo(() => normalizeInputToKey(input), [input]);
+  const autoDetectedKey = useMemo(() => {
+    if (!allProjects?.length) return "";
+    for (const project of allProjects) {
+      const firstImage = (project.images?.[0] as StoredImage | undefined) ?? undefined;
+      if (firstImage?.key) {
+        return firstImage.key;
+      }
+    }
+    return "";
+  }, [allProjects]);
 
   const runCheck = async () => {
     if (!preparedKey) {
@@ -117,7 +133,21 @@ export default function ImageDebugPage() {
             <Button onClick={runCheck} disabled={isChecking}>
               {isChecking ? "Проверяю..." : "Проверить"}
             </Button>
+            <Button
+              variant="outline"
+              onClick={() => {
+                if (autoDetectedKey) setInput(autoDetectedKey);
+              }}
+              disabled={!autoDetectedKey || isProjectsLoading}
+            >
+              {isProjectsLoading ? "Ищу ключ..." : "Подставить ключ автоматически"}
+            </Button>
           </div>
+          {!autoDetectedKey && !isProjectsLoading && (
+            <p className="text-xs text-muted-foreground">
+              Не удалось автоматически найти key: в проектах нет изображений или нет доступа.
+            </p>
+          )}
           {preparedKey && (
             <p className="text-xs text-muted-foreground break-all">
               Нормализованный key: {preparedKey}
