@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "~/server/db";
 import { projects } from "~/server/db/schema";
 import { and, eq } from "drizzle-orm";
-import { getPrivateObject } from "~/lib/storage";
+import { getPrivateObject, getPublicObject } from "~/lib/storage";
 import { requireTelegramUser } from "~/server/telegram-auth";
 import { validateCSRF } from "~/lib/csrf";
 import { checkRateLimit, getClientIp } from "~/lib/rate-limit";
@@ -17,6 +17,25 @@ interface RouteParams {
   }> | {
     id: string;
   };
+}
+
+function mapStorageError(error: unknown): { status: number; message: string } {
+  const fallback = { status: 500, message: "Failed to retrieve file from storage" };
+  if (!error || typeof error !== "object") return fallback;
+
+  const err = error as { name?: string; message?: string; $metadata?: { httpStatusCode?: number } };
+  const code = err.name ?? "";
+  const message = err.message ?? fallback.message;
+  const httpStatus = err.$metadata?.httpStatusCode;
+
+  if (code === "NoSuchKey" || code === "NotFound" || httpStatus === 404) {
+    return { status: 404, message: "File not found in storage" };
+  }
+  if (code === "AccessDenied" || httpStatus === 403) {
+    return { status: 502, message: "Storage access denied" };
+  }
+
+  return { status: 500, message };
 }
 
 export async function GET(
@@ -137,7 +156,16 @@ export async function GET(
     };
 
     try {
-      const s3Object = await getPrivateObject({ key: fileKey });
+      let s3Object;
+      try {
+        s3Object = await getPrivateObject({ key: fileKey });
+      } catch (privateError) {
+        // Backward-compatible fallback for old uploads/misconfigured private bucket.
+        // The route is still auth-protected, so this does not bypass access control.
+        console.warn("Private storage fetch failed, trying public bucket fallback:", privateError);
+        s3Object = await getPublicObject({ key: fileKey });
+      }
+
       if (!s3Object.Body) {
         return NextResponse.json({ error: "File not found in storage" }, { status: 404 });
       }
@@ -145,19 +173,19 @@ export async function GET(
       const bodyBuffer = Buffer.from(await s3Object.Body.transformToByteArray());
       let finalBuffer: Buffer = bodyBuffer;
 
-      if (withWatermark) {
-        try {
+    if (withWatermark) {
+      try {
           // Lazy import: avoid loading heavy watermark dependencies for normal downloads.
           const { addWatermarkToFile } = await import("~/lib/watermark");
           const watermarked = await addWatermarkToFile(bodyBuffer, mimeType, {
             text: "123",
-            opacity: 0.5,
-            fontSize: 16,
-          });
+          opacity: 0.5,
+          fontSize: 16,
+        });
           finalBuffer = Buffer.isBuffer(watermarked)
             ? watermarked
             : Buffer.from(watermarked);
-        } catch (error) {
+      } catch (error) {
           console.error("Ошибка при добавлении водяного знака:", error);
           finalBuffer = bodyBuffer;
         }
@@ -173,9 +201,10 @@ export async function GET(
     });
     } catch (storageError) {
       console.error("Ошибка при получении файла из storage:", storageError);
+      const mapped = mapStorageError(storageError);
       return NextResponse.json(
-        { error: "Failed to retrieve file from storage" },
-        { status: 500 }
+        { error: mapped.message },
+        { status: mapped.status }
       );
     }
     

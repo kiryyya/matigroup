@@ -189,9 +189,18 @@ export default function ProjectPage({ params }: ProjectPageProps) {
     );
       
       if (!response.ok) {
-        const errorText = await response.text();
-      console.error("Ошибка сервера:", errorText);
-        throw new Error(`Ошибка сервера: ${response.status} ${response.statusText}`);
+        const rawText = await response.text();
+        let serverMessage = rawText;
+        try {
+          const parsed = JSON.parse(rawText) as { error?: string };
+          serverMessage = parsed.error ?? rawText;
+        } catch {
+          // Response isn't JSON, keep raw text as-is.
+        }
+        console.error("Ошибка сервера:", serverMessage);
+        throw new Error(
+          `Ошибка сервера: ${response.status} ${serverMessage || response.statusText}`,
+        );
       }
       
     return response.blob();
