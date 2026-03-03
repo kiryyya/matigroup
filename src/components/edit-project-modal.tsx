@@ -7,7 +7,7 @@ import { Label } from "~/components/ui/label";
 import { Textarea } from "~/components/ui/textarea";
 import { useForm } from "react-hook-form";
 import React, { useEffect, useMemo, useState } from "react";
-import { X, Upload, FileText, Link as LinkIcon, File, Image as ImageIcon, FileVideo, FileAudio, Archive } from "lucide-react";
+import { X, Upload, FileText, File, Image as ImageIcon, FileVideo, FileAudio, Archive } from "lucide-react";
 import Image from "next/image";
 import { Dialog, DialogDescription, DialogHeader, DialogTitle, DialogPortal, DialogOverlay } from "~/components/ui/dialog";
 import Loader from "~/components/ui/loader";
@@ -20,6 +20,7 @@ import {
   getImageDimensions,
   uploadFile,
 } from "~/lib/upload";
+import type { ProjectFilterValues } from "~/types/category-filters";
 
 type EditableProject = {
   id: number;
@@ -31,6 +32,7 @@ type EditableProject = {
   attachments?: StoredAttachment[] | null;
   featured?: boolean | null;
   status?: "draft" | "published" | "archived" | null;
+  filterValues?: ProjectFilterValues | null;
 };
 
 interface EditProjectModalProps {
@@ -65,34 +67,61 @@ export default function EditProjectModal({ isOpen, onClose, project }: EditProje
   });
 
   const [images, setImages] = useState<StoredImage[]>([]);
-  const [links, setLinks] = useState<string[]>([]);
   const [attachments, setAttachments] = useState<StoredAttachment[]>([]);
   const [isSaving, setIsSaving] = useState(false);
   const [saveStatus, setSaveStatus] = useState("");
   const [uploadCount, setUploadCount] = useState(0);
+  const [projectFilterValues, setProjectFilterValues] = useState<ProjectFilterValues>({});
 
   const isUploadingFiles = uploadCount > 0;
   const startUpload = () => setUploadCount((count) => count + 1);
   const endUpload = () => setUploadCount((count) => Math.max(0, count - 1));
 
-  const { register, handleSubmit, reset } = useForm<{ title: string; description?: string; content?: string; categoryId: number }>();
+  const { register, handleSubmit, reset, watch } = useForm<{ title: string; description?: string; content?: string; categoryId: number }>();
+  const selectedCategoryId = watch("categoryId");
+  const selectedCategory = categories?.find((category) => category.id === selectedCategoryId);
+  const categoryFilters = useMemo(
+    () => selectedCategory?.filters ?? [],
+    [selectedCategory?.filters],
+  );
 
   // Инициализация значений при открытии
   useEffect(() => {
     if (project) {
       reset({
         title: project.title,
-        description: project.description || undefined,
-        content: project.content || undefined,
+        description: project.description ?? undefined,
+        content: project.content ?? undefined,
         categoryId: project.categoryId,
       });
-      setImages(project.images || []);
-      setAttachments(project.attachments || []);
+      setImages(project.images ?? []);
+      setAttachments(project.attachments ?? []);
+      setProjectFilterValues(project.filterValues ?? {});
     }
   }, [project, reset]);
 
+  useEffect(() => {
+    setProjectFilterValues((prev) => {
+      const next: ProjectFilterValues = {};
+      for (const filter of categoryFilters) {
+        const value = prev[filter.id];
+        if (value && filter.options.includes(value)) {
+          next[filter.id] = value;
+        }
+      }
+      return next;
+    });
+  }, [selectedCategoryId, categoryFilters]);
+
   const onSubmit = async (data: { title: string; description?: string; content?: string; categoryId: number }) => {
     if (!project) return;
+    const missingRequiredFilters = categoryFilters
+      .filter((filter) => filter.required && !projectFilterValues[filter.id])
+      .map((filter) => filter.name);
+    if (missingRequiredFilters.length > 0) {
+      alert(`Заполните обязательные фильтры: ${missingRequiredFilters.join(", ")}`);
+      return;
+    }
 
     setIsSaving(true);
       setSaveStatus("Сохранение изменений...");
@@ -106,6 +135,7 @@ export default function EditProjectModal({ isOpen, onClose, project }: EditProje
         categoryId: data.categoryId,
         images: images,
         attachments: attachments,
+        filterValues: projectFilterValues,
       });
 
       setSaveStatus("Проект обновлен!");
@@ -336,6 +366,40 @@ export default function EditProjectModal({ isOpen, onClose, project }: EditProje
                 ))}
               </select>
             </div>
+
+            {categoryFilters.length > 0 && (
+              <div className="space-y-3">
+                <Label>Фильтры категории</Label>
+                <div className="space-y-2">
+                  {categoryFilters.map((filter) => (
+                    <div key={filter.id} className="space-y-1">
+                      <Label htmlFor={`project-filter-${filter.id}`}>
+                        {filter.name}
+                        {filter.required ? " *" : ""}
+                      </Label>
+                      <select
+                        id={`project-filter-${filter.id}`}
+                        value={projectFilterValues[filter.id] ?? ""}
+                        onChange={(e) =>
+                          setProjectFilterValues((prev) => ({
+                            ...prev,
+                            [filter.id]: e.target.value,
+                          }))
+                        }
+                        className="w-full p-2 border border-input rounded-md bg-background"
+                      >
+                        <option value="">Выберите значение</option>
+                        {filter.options.map((option) => (
+                          <option key={option} value={option}>
+                            {option}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             <div className="space-y-2">
               <Label>Изображения</Label>

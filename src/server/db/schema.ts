@@ -1,4 +1,5 @@
-import { InferSelectModel, relations, sql } from "drizzle-orm";
+import { relations, sql } from "drizzle-orm";
+import type { InferSelectModel } from "drizzle-orm";
 import {
   boolean,
   integer,
@@ -10,6 +11,10 @@ import {
   varchar,
 } from "drizzle-orm/pg-core";
 import type { StoredAttachment, StoredImage } from "~/types/files";
+import type {
+  CategoryFilterDefinition,
+  ProjectFilterValues,
+} from "~/types/category-filters";
 
 /**
  * This is an example of how to use the multi-project schema feature of Drizzle ORM. Use the same
@@ -51,6 +56,7 @@ export const categories = createTable("categories", {
   icon: varchar("icon", { length: 255 }),
   color: varchar("color", { length: 7 }), // hex color
   backgroundImage: varchar("background_image", { length: 500 }), // URL или путь к фоновому изображению
+  filters: json("filters").$type<CategoryFilterDefinition[]>().default([]),
   createdAt: timestamp("created_at", { withTimezone: true })
     .default(sql`CURRENT_TIMESTAMP`)
     .notNull(),
@@ -67,6 +73,7 @@ export const projects = createTable("projects", {
   content: text("content"), // detailed description
   images: json("images").$type<StoredImage[]>().default([]),
   attachments: json("attachments").$type<StoredAttachment[]>().default([]),
+  filterValues: json("filter_values").$type<ProjectFilterValues>().default({}),
   categoryId: integer("category_id")
     .notNull()
     .references(() => categories.id, { onDelete: "cascade" }),

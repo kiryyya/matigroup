@@ -11,6 +11,40 @@ import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
 import { Textarea } from "~/components/ui/textarea";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "~/components/ui/dialog";
+import type { CategoryFilterDefinition } from "~/types/category-filters";
+
+type EditableCategoryFilter = {
+  localId: string;
+  id?: string;
+  name: string;
+  optionsText: string;
+  required: boolean;
+};
+
+function toEditableFilters(
+  filters: CategoryFilterDefinition[] | null | undefined,
+): EditableCategoryFilter[] {
+  return (filters ?? []).map((filter, index) => ({
+    localId: `${filter.id}-${index}`,
+    id: filter.id,
+    name: filter.name,
+    optionsText: filter.options.join(", "),
+    required: filter.required,
+  }));
+}
+
+function createEmptyFilter(): EditableCategoryFilter {
+  const localId =
+    typeof crypto !== "undefined" && crypto.randomUUID
+      ? crypto.randomUUID()
+      : `new-filter-${Date.now()}`;
+  return {
+    localId,
+    name: "",
+    optionsText: "",
+    required: false,
+  };
+}
 
 export default function CategoriesSettingsPage() {
   const { data: user, isLoading: isLoadingUser } = api.tg.getUser.useQuery();
@@ -26,6 +60,7 @@ export default function CategoriesSettingsPage() {
     icon: "",
     color: "",
     backgroundImage: "",
+    filters: [] as EditableCategoryFilter[],
   });
 
   const createCategory = api.categories.create.useMutation({
@@ -64,6 +99,7 @@ export default function CategoriesSettingsPage() {
       icon: "",
       color: "",
       backgroundImage: "",
+      filters: [],
     });
   };
 
@@ -76,6 +112,7 @@ export default function CategoriesSettingsPage() {
       icon: category.icon ?? "",
       color: category.color ?? "",
       backgroundImage: category.backgroundImage ?? "",
+      filters: toEditableFilters(category.filters),
     });
   };
 
@@ -88,6 +125,21 @@ export default function CategoriesSettingsPage() {
     }
 
     try {
+      const preparedFilters = formData.filters
+        .map((filter) => {
+          const options = filter.optionsText
+            .split(",")
+            .map((value) => value.trim())
+            .filter(Boolean);
+          return {
+            id: filter.id,
+            name: filter.name.trim(),
+            options,
+            required: filter.required,
+          };
+        })
+        .filter((filter) => filter.name && filter.options.length > 0);
+
       if (editingCategory) {
         await updateCategory.mutateAsync({
           id: editingCategory,
@@ -97,6 +149,7 @@ export default function CategoriesSettingsPage() {
           icon: formData.icon || undefined,
           color: formData.color || undefined,
           backgroundImage: formData.backgroundImage || undefined,
+          filters: preparedFilters,
         });
       } else {
         await createCategory.mutateAsync({
@@ -106,6 +159,7 @@ export default function CategoriesSettingsPage() {
           icon: formData.icon || undefined,
           color: formData.color || undefined,
           backgroundImage: formData.backgroundImage || undefined,
+          filters: preparedFilters,
         });
       }
     } catch (error) {
@@ -125,6 +179,32 @@ export default function CategoriesSettingsPage() {
       console.error("Ошибка удаления категории:", error);
       alert(error instanceof Error ? error.message : "Ошибка удаления категории");
     }
+  };
+
+  const addFilter = () => {
+    setFormData((prev) => ({
+      ...prev,
+      filters: [...prev.filters, createEmptyFilter()],
+    }));
+  };
+
+  const removeFilter = (localId: string) => {
+    setFormData((prev) => ({
+      ...prev,
+      filters: prev.filters.filter((filter) => filter.localId !== localId),
+    }));
+  };
+
+  const updateFilter = (
+    localId: string,
+    patch: Partial<EditableCategoryFilter>,
+  ) => {
+    setFormData((prev) => ({
+      ...prev,
+      filters: prev.filters.map((filter) =>
+        filter.localId === localId ? { ...filter, ...patch } : filter,
+      ),
+    }));
   };
 
   if (isLoadingUser || isLoadingCategories) {
@@ -209,6 +289,10 @@ export default function CategoriesSettingsPage() {
                       <span className="text-xs">✓ Установлен</span>
                     </div>
                   )}
+                  <div>
+                    <span className="text-muted-foreground">Фильтры:</span>{" "}
+                    <span className="text-xs">{category.filters?.length ?? 0}</span>
+                  </div>
                 </div>
                 <div className="flex gap-2 mt-4">
                   <Button
@@ -337,6 +421,66 @@ export default function CategoriesSettingsPage() {
               <p className="text-xs text-muted-foreground mt-1">
                 Изображение будет использоваться как фон на главной странице
               </p>
+            </div>
+
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <Label>Фильтры категории</Label>
+                <Button type="button" variant="outline" size="sm" onClick={addFilter}>
+                  <Plus className="h-4 w-4 mr-1" />
+                  Добавить фильтр
+                </Button>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Пример: фильтр «Стиль», значения «Современный, Классика». Эти значения будут обязательны/доступны при создании проекта.
+              </p>
+              <div className="space-y-3">
+                {formData.filters.map((filter, index) => (
+                  <div key={filter.localId} className="border rounded-md p-3 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <p className="text-sm font-medium">Фильтр #{index + 1}</p>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => removeFilter(filter.localId)}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                    <div>
+                      <Label>Название фильтра</Label>
+                      <Input
+                        value={filter.name}
+                        onChange={(e) =>
+                          updateFilter(filter.localId, { name: e.target.value })
+                        }
+                        placeholder="Например: Стиль"
+                      />
+                    </div>
+                    <div>
+                      <Label>Значения (через запятую)</Label>
+                      <Input
+                        value={filter.optionsText}
+                        onChange={(e) =>
+                          updateFilter(filter.localId, { optionsText: e.target.value })
+                        }
+                        placeholder="Современный, Классика, Минимализм"
+                      />
+                    </div>
+                    <label className="flex items-center gap-2 text-sm">
+                      <input
+                        type="checkbox"
+                        checked={filter.required}
+                        onChange={(e) =>
+                          updateFilter(filter.localId, { required: e.target.checked })
+                        }
+                      />
+                      Обязательный для заполнения в проекте
+                    </label>
+                  </div>
+                ))}
+              </div>
             </div>
 
             <div className="flex justify-end gap-2 pt-4">

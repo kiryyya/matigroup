@@ -4,6 +4,61 @@ import { z } from "zod";
 import { db } from "~/server/db";
 import { categories } from "~/server/db/schema";
 import { eq, desc } from "drizzle-orm";
+import type { CategoryFilterDefinition } from "~/types/category-filters";
+
+const categoryFilterSchema = z.object({
+  id: z.string().min(1).optional(),
+  name: z.string().min(1, "Название фильтра обязательно"),
+  options: z
+    .array(z.string().min(1, "Значение фильтра не может быть пустым"))
+    .min(1, "Добавьте хотя бы одно значение фильтра"),
+  required: z.boolean().default(false),
+});
+
+function sanitizeFilterId(value: string) {
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, "-")
+    .replace(/[^a-z0-9-_]/g, "")
+    .slice(0, 64);
+}
+
+function normalizeCategoryFilters(
+  filters: z.infer<typeof categoryFilterSchema>[] | undefined,
+): CategoryFilterDefinition[] {
+  if (!filters?.length) {
+    return [];
+  }
+
+  const usedIds = new Set<string>();
+
+  return filters
+    .map((filter, index) => {
+      const name = filter.name.trim();
+      const options = [...new Set(filter.options.map((option) => option.trim()).filter(Boolean))];
+      if (!name || options.length === 0) {
+        return null;
+      }
+
+      const baseId = sanitizeFilterId(filter.id ?? "") || sanitizeFilterId(name) || `filter-${index + 1}`;
+      let uniqueId = baseId;
+      let suffix = 1;
+      while (usedIds.has(uniqueId)) {
+        uniqueId = `${baseId}-${suffix}`;
+        suffix += 1;
+      }
+      usedIds.add(uniqueId);
+
+      return {
+        id: uniqueId,
+        name,
+        options,
+        required: Boolean(filter.required),
+      };
+    })
+    .filter((filter): filter is CategoryFilterDefinition => filter !== null);
+}
 
 const createCategorySchema = z.object({
   name: z.string().min(1, "Название обязательно"),
@@ -12,6 +67,7 @@ const createCategorySchema = z.object({
   icon: z.string().optional(),
   color: z.string().regex(/^#[0-9A-Fa-f]{6}$/, "Цвет должен быть в формате HEX (#RRGGBB)").optional(),
   backgroundImage: z.string().url("Неверный URL изображения").optional(),
+  filters: z.array(categoryFilterSchema).optional(),
 });
 
 const updateCategorySchema = createCategorySchema.partial().extend({
@@ -32,6 +88,23 @@ export const categoriesRouter = createTRPCRouter({
     .query(async ({ input }) => {
       const category = await db.query.categories.findFirst({
         where: eq(categories.id, input.id),
+      });
+
+      if (!category) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Категория не найдена",
+        });
+      }
+
+      return category;
+    }),
+
+  getBySlug: publicProcedure
+    .input(z.object({ slug: z.string() }))
+    .query(async ({ input }) => {
+      const category = await db.query.categories.findFirst({
+        where: eq(categories.slug, input.slug),
       });
 
       if (!category) {
@@ -76,6 +149,7 @@ export const categoriesRouter = createTRPCRouter({
           icon: input.icon,
           color: input.color,
           backgroundImage: input.backgroundImage,
+          filters: normalizeCategoryFilters(input.filters),
         })
         .returning()
         .then((r) => r[0]);
@@ -94,7 +168,7 @@ export const categoriesRouter = createTRPCRouter({
         });
       }
 
-      const { id, ...updateData } = input;
+      const { id, filters, ...updateData } = input;
 
       // Проверяем, существует ли категория
       const existingCategory = await db.query.categories.findFirst({
@@ -124,7 +198,12 @@ export const categoriesRouter = createTRPCRouter({
 
       const updatedCategory = await db
         .update(categories)
-        .set(updateData)
+        .set({
+          ...updateData,
+          ...(filters !== undefined
+            ? { filters: normalizeCategoryFilters(filters) }
+            : {}),
+        })
         .where(eq(categories.id, id))
         .returning()
         .then((r) => r[0]);

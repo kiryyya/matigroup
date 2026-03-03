@@ -22,6 +22,7 @@ import {
   getImageDimensions,
   uploadFile,
 } from "~/lib/upload";
+import type { ProjectFilterValues } from "~/types/category-filters";
 
 const projectSchema = z.object({
   title: z.string().min(1, "Название обязательно"),
@@ -66,6 +67,7 @@ export default function CreateProjectModal({ isOpen, onClose }: CreateProjectMod
   const [saveStatus, setSaveStatus] = useState("");
   const [isProcessingImages, setIsProcessingImages] = useState(false);
   const [uploadCount, setUploadCount] = useState(0);
+  const [projectFilterValues, setProjectFilterValues] = useState<ProjectFilterValues>({});
 
   const isUploadingFiles = uploadCount > 0;
   const startUpload = () => setUploadCount((count) => count + 1);
@@ -75,7 +77,28 @@ export default function CreateProjectModal({ isOpen, onClose }: CreateProjectMod
     register,
     handleSubmit,
     reset,
+    watch,
   } = useForm<ProjectFormData>();
+
+  const selectedCategoryId = watch("categoryId");
+  const selectedCategory = categories?.find((category) => category.id === selectedCategoryId);
+  const categoryFilters = React.useMemo(
+    () => selectedCategory?.filters ?? [],
+    [selectedCategory?.filters],
+  );
+
+  React.useEffect(() => {
+    setProjectFilterValues((prev) => {
+      const next: ProjectFilterValues = {};
+      for (const filter of categoryFilters) {
+        const value = prev[filter.id];
+        if (value && filter.options.includes(value)) {
+          next[filter.id] = value;
+        }
+      }
+      return next;
+    });
+  }, [selectedCategoryId, categoryFilters]);
 
   const onSubmit = async (data: ProjectFormData) => {
     // Простая валидация
@@ -87,6 +110,13 @@ export default function CreateProjectModal({ isOpen, onClose }: CreateProjectMod
       alert("Выберите категорию");
       return;
     }
+    const missingRequiredFilters = categoryFilters
+      .filter((filter) => filter.required && !projectFilterValues[filter.id])
+      .map((filter) => filter.name);
+    if (missingRequiredFilters.length > 0) {
+      alert(`Заполните обязательные фильтры: ${missingRequiredFilters.join(", ")}`);
+      return;
+    }
 
     setIsSaving(true);
     setSaveStatus("Сохранение проекта...");
@@ -94,11 +124,12 @@ export default function CreateProjectModal({ isOpen, onClose }: CreateProjectMod
     try {
       await createProject.mutateAsync({
         title: data.title,
-        description: data.description || undefined,
-        content: data.content || undefined,
+        description: data.description ? data.description : undefined,
+        content: data.content ? data.content : undefined,
         categoryId: data.categoryId,
         images: images.length > 0 ? images : undefined,
         attachments: attachments.length > 0 ? attachments : undefined,
+        filterValues: projectFilterValues,
         status: "published",
         featured: false,
       });
@@ -111,6 +142,7 @@ export default function CreateProjectModal({ isOpen, onClose }: CreateProjectMod
       setImages([]);
       setLinks([]);
       setAttachments([]);
+      setProjectFilterValues({});
       
       onClose();
     } catch (error) {
@@ -402,6 +434,40 @@ export default function CreateProjectModal({ isOpen, onClose }: CreateProjectMod
               ))}
             </select>
           </div>
+
+          {categoryFilters.length > 0 && (
+            <div className="space-y-3">
+              <Label>Фильтры категории</Label>
+              <div className="space-y-2">
+                {categoryFilters.map((filter) => (
+                  <div key={filter.id} className="space-y-1">
+                    <Label htmlFor={`category-filter-${filter.id}`}>
+                      {filter.name}
+                      {filter.required ? " *" : ""}
+                    </Label>
+                    <select
+                      id={`category-filter-${filter.id}`}
+                      value={projectFilterValues[filter.id] ?? ""}
+                      onChange={(e) =>
+                        setProjectFilterValues((prev) => ({
+                          ...prev,
+                          [filter.id]: e.target.value,
+                        }))
+                      }
+                      className="w-full p-2 border border-input rounded-md bg-background"
+                    >
+                      <option value="">Выберите значение</option>
+                      {filter.options.map((option) => (
+                        <option key={option} value={option}>
+                          {option}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* Изображения */}
           <div className="space-y-2">

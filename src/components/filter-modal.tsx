@@ -7,12 +7,14 @@ import { Label } from "~/components/ui/label";
 import { Checkbox } from "~/components/ui/checkbox";
 import { Filter, X } from "lucide-react";
 import { cn } from "~/lib/utils";
+import type { CategoryFilterDefinition } from "~/types/category-filters";
 
 export interface FilterOptions {
   searchQuery: string;
   sortBy: 'date' | 'alphabet';
   sortOrder: 'asc' | 'desc';
   dateRange: 'all' | 'week' | 'month' | 'year';
+  categoryValues: Record<string, string>;
 }
 
 interface FilterModalProps {
@@ -20,22 +22,29 @@ interface FilterModalProps {
   onFiltersChange: (filters: FilterOptions) => void;
   onClearFilters: () => void;
   projectCount: number;
+  categoryFilters?: CategoryFilterDefinition[];
 }
 
 export default function FilterModal({ 
   filters, 
   onFiltersChange, 
   onClearFilters, 
-  projectCount 
+  projectCount,
+  categoryFilters = [],
 }: FilterModalProps) {
   const [isOpen, setIsOpen] = React.useState(false);
   const [localFilters, setLocalFilters] = React.useState<FilterOptions>(filters);
+
+  React.useEffect(() => {
+    setLocalFilters(filters);
+  }, [filters]);
 
   const hasActiveFilters = 
     filters.searchQuery !== '' || 
     filters.sortBy !== 'date' || 
     filters.sortOrder !== 'desc' || 
-    filters.dateRange !== 'all';
+    filters.dateRange !== 'all' ||
+    Object.values(filters.categoryValues).some(Boolean);
 
   const handleApplyFilters = () => {
     onFiltersChange(localFilters);
@@ -47,14 +56,18 @@ export default function FilterModal({
       searchQuery: '',
       sortBy: 'date',
       sortOrder: 'desc',
-      dateRange: 'all'
+      dateRange: 'all',
+      categoryValues: {},
     };
     setLocalFilters(defaultFilters);
     onClearFilters();
     setIsOpen(false);
   };
 
-  const updateFilter = (key: keyof FilterOptions, value: any) => {
+  const updateFilter = <K extends keyof FilterOptions>(
+    key: K,
+    value: FilterOptions[K],
+  ) => {
     setLocalFilters(prev => ({ ...prev, [key]: value }));
   };
 
@@ -213,6 +226,39 @@ export default function FilterModal({
               </div>
             </div>
           </div>
+
+          {categoryFilters.length > 0 && (
+            <div className="space-y-3">
+              <Label>Фильтры категории</Label>
+              <div className="space-y-2">
+                {categoryFilters.map((filter) => (
+                  <div key={filter.id} className="space-y-1">
+                    <Label htmlFor={`category-filter-modal-${filter.id}`} className="text-sm font-normal">
+                      {filter.name}
+                    </Label>
+                    <select
+                      id={`category-filter-modal-${filter.id}`}
+                      className="w-full p-2 border border-input rounded-md bg-background text-sm"
+                      value={localFilters.categoryValues[filter.id] ?? ""}
+                      onChange={(e) =>
+                        updateFilter("categoryValues", {
+                          ...localFilters.categoryValues,
+                          [filter.id]: e.target.value,
+                        })
+                      }
+                    >
+                      <option value="">Все значения</option>
+                      {filter.options.map((option) => (
+                        <option key={option} value={option}>
+                          {option}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
 
         <div className="flex gap-2 pt-4">

@@ -5,6 +5,10 @@ import { categories, projects, users } from "~/server/db/schema";
 import { eq, and, desc, lt } from "drizzle-orm";
 import type { StoredImage } from "~/types/files";
 import sanitizeHtml from "sanitize-html";
+import type {
+  CategoryFilterDefinition,
+  ProjectFilterValues,
+} from "~/types/category-filters";
 
 // Вспомогательная функция для парсинга изображений из JSON
 function parseImages(images: unknown): StoredImage[] {
@@ -39,13 +43,15 @@ function transformImageUrl(url: string, key: string): string {
   // Если URL указывает на Selectel, преобразуем в прокси
   // Исправлено: добавлены скобки для правильного приоритета операторов
   if (url.includes('s3.ru-7.storage.selcloud.ru') || (url.includes('s3.') && url.includes('.storage.selcloud.ru'))) {
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://matigroup-test-bot.ru';
+    const baseUrl =
+      process.env.NEXT_PUBLIC_APP_URL ?? "https://matigroup-test-bot.ru";
     return `${baseUrl}/api/images/${key}`;
   }
   
   // Также проверяем другие возможные форматы URL Selectel
   if (url.includes('storage.selcloud.ru')) {
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://matigroup-test-bot.ru';
+    const baseUrl =
+      process.env.NEXT_PUBLIC_APP_URL ?? "https://matigroup-test-bot.ru";
     return `${baseUrl}/api/images/${key}`;
   }
   
@@ -126,6 +132,52 @@ function sanitizeProjectContent(content?: string | null): string | undefined {
     allowedSchemes: ["http", "https", "mailto", "tel"],
   });
 }
+
+function normalizeProjectFilterValues(
+  rawValues: ProjectFilterValues | undefined,
+  categoryFilters: CategoryFilterDefinition[],
+) {
+  const normalized: ProjectFilterValues = {};
+  const categoryFiltersById = new Map(categoryFilters.map((filter) => [filter.id, filter]));
+
+  for (const [filterId, rawValue] of Object.entries(rawValues ?? {})) {
+    if (typeof rawValue !== "string") {
+      continue;
+    }
+    const value = rawValue.trim();
+    if (!value) {
+      continue;
+    }
+
+    const definition = categoryFiltersById.get(filterId);
+    if (!definition) {
+      continue;
+    }
+    if (!definition.options.includes(value)) {
+      continue;
+    }
+    normalized[filterId] = value;
+  }
+
+  return normalized;
+}
+
+function validateRequiredCategoryFilters(
+  values: ProjectFilterValues,
+  categoryFilters: CategoryFilterDefinition[],
+) {
+  const missing = categoryFilters
+    .filter((filter) => filter.required && !values[filter.id])
+    .map((filter) => filter.name);
+
+  if (missing.length > 0) {
+    throw new Error(
+      `Не заполнены обязательные фильтры категории: ${missing.join(", ")}`,
+    );
+  }
+}
+
+const filterValuesSchema = z.record(z.string(), z.string()).optional();
 
 export const projectsRouter = createTRPCRouter({
   // Get all categories
@@ -359,6 +411,7 @@ export const projectsRouter = createTRPCRouter({
         categoryId: z.number(),
         status: z.enum(["draft", "published", "archived"]).default("draft"),
         featured: z.boolean().default(false),
+        filterValues: filterValuesSchema,
       }),
     )
     .mutation(async ({ input, ctx }) => {
@@ -367,9 +420,26 @@ export const projectsRouter = createTRPCRouter({
       }
 
       try {
+        const category = await db.query.categories.findFirst({
+          where: eq(categories.id, input.categoryId),
+        });
+        if (!category) {
+          throw new Error("Категория не найдена");
+        }
+
+        const normalizedFilterValues = normalizeProjectFilterValues(
+          input.filterValues,
+          category.filters ?? [],
+        );
+        validateRequiredCategoryFilters(
+          normalizedFilterValues,
+          category.filters ?? [],
+        );
+
         const sanitizedInput = {
           ...input,
           content: sanitizeProjectContent(input.content),
+          filterValues: normalizedFilterValues,
         };
 
         const result = await db.insert(projects).values({
@@ -435,6 +505,7 @@ export const projectsRouter = createTRPCRouter({
         categoryId: z.number().optional(),
         status: z.enum(["draft", "published", "archived"]).optional(),
         featured: z.boolean().optional(),
+        filterValues: filterValuesSchema,
       }),
     )
     .mutation(async ({ input, ctx }) => {
@@ -443,11 +514,39 @@ export const projectsRouter = createTRPCRouter({
       }
 
       const { id, ...updateData } = input;
+
+      const existingProject = await db.query.projects.findFirst({
+        where: eq(projects.id, id),
+      });
+      if (!existingProject) {
+        throw new Error("Проект не найден");
+      }
+
+      const nextCategoryId = updateData.categoryId ?? existingProject.categoryId;
+      const category = await db.query.categories.findFirst({
+        where: eq(categories.id, nextCategoryId),
+      });
+      if (!category) {
+        throw new Error("Категория не найдена");
+      }
+
+      const baseFilterValues =
+        updateData.filterValues ?? existingProject.filterValues ?? {};
+      const normalizedFilterValues = normalizeProjectFilterValues(
+        baseFilterValues,
+        category.filters ?? [],
+      );
+      validateRequiredCategoryFilters(
+        normalizedFilterValues,
+        category.filters ?? [],
+      );
+
       const sanitizedUpdateData = {
         ...updateData,
         ...(updateData.content !== undefined
           ? { content: sanitizeProjectContent(updateData.content) }
           : {}),
+        filterValues: normalizedFilterValues,
       };
       return await db
         .update(projects)
@@ -569,7 +668,7 @@ export const projectsRouter = createTRPCRouter({
           columns: { favorites: true },
         });
 
-        const currentFavorites = user?.favorites || [];
+        const currentFavorites = user?.favorites ?? [];
 
         // Check if already in favorites
         if (currentFavorites.includes(input.projectId)) {
@@ -602,7 +701,7 @@ export const projectsRouter = createTRPCRouter({
           columns: { favorites: true },
         });
 
-        const currentFavorites = user?.favorites || [];
+        const currentFavorites = user?.favorites ?? [];
 
         // Remove from favorites
         const newFavorites = currentFavorites.filter(id => id !== input.projectId);
@@ -629,7 +728,7 @@ export const projectsRouter = createTRPCRouter({
           columns: { favorites: true },
         });
 
-        return user?.favorites?.includes(input.projectId) || false;
+        return user?.favorites?.includes(input.projectId) ?? false;
       } catch (error) {
         console.error("Error checking favorite status:", error);
         return false;

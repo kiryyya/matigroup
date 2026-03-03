@@ -1,7 +1,7 @@
 "use client";
 
 import { api } from "~/trpc/react";
-import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
+import { Card, CardContent, CardTitle } from "~/components/ui/card";
 import { Button } from "~/components/ui/button";
 import Link from "next/link";
 // Using native img for robust preview rendering (supports data URLs and any origin)
@@ -19,13 +19,6 @@ interface CategoryPageProps {
   };
 }
 
-const categoryNames: Record<string, string> = {
-  "real-estate": "Недвижимость",
-  "interiors": "Интерьеры", 
-  "facades": "Фасады",
-  "furniture": "Мебель",
-};
-
 const categoryIcons: Record<string, string> = {
   "real-estate": "",
   "interiors": "",
@@ -34,6 +27,7 @@ const categoryIcons: Record<string, string> = {
 };
 
 export default function CategoryPage({ params }: CategoryPageProps) {
+  const { data: categoryData } = api.categories.getBySlug.useQuery({ slug: params.slug });
   const {
     data,
     fetchNextPage,
@@ -61,11 +55,12 @@ export default function CategoryPage({ params }: CategoryPageProps) {
     searchQuery: '',
     sortBy: 'date',
     sortOrder: 'desc',
-    dateRange: 'all'
+    dateRange: 'all',
+    categoryValues: {},
   });
 
-  const categoryName = categoryNames[params.slug] ?? "Категория";
-  const categoryIcon = categoryIcons[params.slug] ?? "📁";
+  const categoryIcon = categoryData?.icon ?? categoryIcons[params.slug] ?? "📁";
+  const categoryFilters = categoryData?.filters ?? [];
 
   // Ref для элемента, который будет триггерить загрузку следующей страницы
   const loadMoreRef = useRef<HTMLDivElement>(null);
@@ -75,7 +70,7 @@ export default function CategoryPage({ params }: CategoryPageProps) {
     const observer = new IntersectionObserver(
       (entries) => {
         if (entries[0]?.isIntersecting && hasNextPage && !isFetchingNextPage) {
-          fetchNextPage();
+          void fetchNextPage();
         }
       },
       { threshold: 0.1 }
@@ -121,6 +116,20 @@ export default function CategoryPage({ params }: CategoryPageProps) {
       );
     }
 
+    // Фильтры категории
+    const activeCategoryFilters = Object.entries(filters.categoryValues).filter(
+      ([, value]) => Boolean(value),
+    );
+    if (activeCategoryFilters.length > 0) {
+      filtered = filtered.filter((project) => {
+        const projectFilterValues = project.filterValues ?? {};
+        return activeCategoryFilters.every(
+          ([filterId, selectedValue]) =>
+            projectFilterValues[filterId] === selectedValue,
+        );
+      });
+    }
+
     // Сортировка
     filtered.sort((a, b) => {
       if (filters.sortBy === 'date') {
@@ -148,7 +157,8 @@ export default function CategoryPage({ params }: CategoryPageProps) {
       searchQuery: '',
       sortBy: 'date',
       sortOrder: 'desc',
-      dateRange: 'all'
+      dateRange: 'all',
+      categoryValues: {},
     });
   };
 
@@ -220,6 +230,7 @@ export default function CategoryPage({ params }: CategoryPageProps) {
           onFiltersChange={handleFiltersChange}
           onClearFilters={handleClearFilters}
           projectCount={filteredProjects.length}
+          categoryFilters={categoryFilters}
         />
       </div>
 
