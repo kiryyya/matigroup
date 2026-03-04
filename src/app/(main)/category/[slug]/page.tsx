@@ -61,6 +61,19 @@ export default function CategoryPage({ params }: CategoryPageProps) {
 
   const categoryIcon = categoryData?.icon ?? categoryIcons[params.slug] ?? "📁";
   const categoryFilters = categoryData?.filters ?? [];
+  const quickFilterItems = useMemo(
+    () =>
+      categoryFilters
+        .map((filter) => {
+          const value = filter.options[0]?.trim() ?? "";
+          return {
+            id: filter.id,
+            value,
+          };
+        })
+        .filter((item) => item.value.length > 0),
+    [categoryFilters],
+  );
 
   // Ref для элемента, который будет триггерить загрузку следующей страницы
   const loadMoreRef = useRef<HTMLDivElement>(null);
@@ -170,9 +183,17 @@ export default function CategoryPage({ params }: CategoryPageProps) {
     setFilters((prev) => ({
       ...prev,
       categoryValues: {
-        ...prev.categoryValues,
+        // Быстрые фильтры работают как единый переключатель "как категории"
+        // поэтому оставляем только одно активное значение.
         [filterId]: value,
       },
+    }));
+  };
+
+  const clearQuickCategoryFilters = () => {
+    setFilters((prev) => ({
+      ...prev,
+      categoryValues: {},
     }));
   };
 
@@ -244,39 +265,35 @@ export default function CategoryPage({ params }: CategoryPageProps) {
         />
       </div>
 
-      {categoryFilters.length > 0 && (
-        <div className="space-y-3">
-          {categoryFilters.map((filter) => {
-            const activeValue = filters.categoryValues[filter.id] ?? "";
+      {quickFilterItems.length > 0 && (
+        <div className="flex gap-2 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          <Button
+            type="button"
+            variant={Object.keys(filters.categoryValues).length === 0 ? "default" : "outline"}
+            size="sm"
+            onClick={clearQuickCategoryFilters}
+            className="whitespace-nowrap rounded-full"
+          >
+            Все
+          </Button>
+          {quickFilterItems.map((item) => {
+            const activeValue = filters.categoryValues[item.id];
+            const isActive = activeValue === item.value;
             return (
-              <div key={filter.id} className="space-y-2">
-                <div className="text-sm font-medium text-foreground/90">
-                  {filter.name}
-                </div>
-                <div className="flex gap-2 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-                  <Button
-                    type="button"
-                    variant={activeValue === "" ? "default" : "outline"}
-                    size="sm"
-                    onClick={() => setQuickCategoryFilter(filter.id, "")}
-                    className="whitespace-nowrap rounded-full"
-                  >
-                    Все
-                  </Button>
-                  {filter.options.map((option) => (
-                    <Button
-                      key={option}
-                      type="button"
-                      variant={activeValue === option ? "default" : "outline"}
-                      size="sm"
-                      onClick={() => setQuickCategoryFilter(filter.id, option)}
-                      className="whitespace-nowrap rounded-full"
-                    >
-                      {option}
-                    </Button>
-                  ))}
-                </div>
-              </div>
+              <Button
+                key={item.id}
+                type="button"
+                variant={isActive ? "default" : "outline"}
+                size="sm"
+                onClick={() =>
+                  isActive
+                    ? clearQuickCategoryFilters()
+                    : setQuickCategoryFilter(item.id, item.value)
+                }
+                className="whitespace-nowrap rounded-full"
+              >
+                {item.value}
+              </Button>
             );
           })}
         </div>

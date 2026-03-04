@@ -16,21 +16,26 @@ import type { CategoryFilterDefinition } from "~/types/category-filters";
 type EditableCategoryFilter = {
   localId: string;
   id?: string;
-  name: string;
-  optionsText: string;
+  value: string;
   required: boolean;
 };
 
 function toEditableFilters(
   filters: CategoryFilterDefinition[] | null | undefined,
 ): EditableCategoryFilter[] {
-  return (filters ?? []).map((filter, index) => ({
-    localId: `${filter.id}-${index}`,
-    id: filter.id,
-    name: filter.name,
-    optionsText: filter.options.join(", "),
-    required: filter.required,
-  }));
+  const flattened = (filters ?? []).flatMap((filter, index) => {
+    const values = filter.options.length > 0 ? filter.options : [filter.name];
+    return values.map((rawValue, optionIndex) => {
+      const value = rawValue.trim();
+      return {
+        localId: `${filter.id}-${index}-${optionIndex}`,
+        id: values.length === 1 ? filter.id : undefined,
+        value,
+        required: filter.required,
+      };
+    });
+  });
+  return flattened.filter((filter) => filter.value.length > 0);
 }
 
 function createEmptyFilter(): EditableCategoryFilter {
@@ -40,8 +45,7 @@ function createEmptyFilter(): EditableCategoryFilter {
       : `new-filter-${Date.now()}`;
   return {
     localId,
-    name: "",
-    optionsText: "",
+    value: "",
     required: false,
   };
 }
@@ -127,18 +131,18 @@ export default function CategoriesSettingsPage() {
     try {
       const preparedFilters = formData.filters
         .map((filter) => {
-          const options = filter.optionsText
-            .split(",")
-            .map((value) => value.trim())
-            .filter(Boolean);
+          const value = filter.value.trim();
+          if (!value) {
+            return null;
+          }
           return {
             id: filter.id,
-            name: filter.name.trim(),
-            options,
+            name: value,
+            options: [value],
             required: filter.required,
           };
         })
-        .filter((filter) => filter.name && filter.options.length > 0);
+        .filter((filter): filter is NonNullable<typeof filter> => Boolean(filter));
 
       if (editingCategory) {
         await updateCategory.mutateAsync({
@@ -432,7 +436,7 @@ export default function CategoriesSettingsPage() {
                 </Button>
               </div>
               <p className="text-xs text-muted-foreground">
-                Пример: фильтр «Стиль», значения «Современный, Классика». Эти значения будут обязательны/доступны при создании проекта.
+                Каждый фильтр хранит одно значение. Эти значения будут доступны как быстрые фильтры на странице категории.
               </p>
               <div className="space-y-3">
                 {formData.filters.map((filter, index) => (
@@ -449,23 +453,13 @@ export default function CategoriesSettingsPage() {
                       </Button>
                     </div>
                     <div>
-                      <Label>Название фильтра</Label>
+                      <Label>Значение фильтра</Label>
                       <Input
-                        value={filter.name}
+                        value={filter.value}
                         onChange={(e) =>
-                          updateFilter(filter.localId, { name: e.target.value })
+                          updateFilter(filter.localId, { value: e.target.value })
                         }
-                        placeholder="Например: Стиль"
-                      />
-                    </div>
-                    <div>
-                      <Label>Значения (через запятую)</Label>
-                      <Input
-                        value={filter.optionsText}
-                        onChange={(e) =>
-                          updateFilter(filter.localId, { optionsText: e.target.value })
-                        }
-                        placeholder="Современный, Классика, Минимализм"
+                        placeholder="Например: Современный"
                       />
                     </div>
                     <label className="flex items-center gap-2 text-sm">
