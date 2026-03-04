@@ -166,6 +166,16 @@ export default function CategoryPage({ params }: CategoryPageProps) {
     setFilters(prev => ({ ...prev, searchQuery: '' }));
   };
 
+  const setQuickCategoryFilter = (filterId: string, value: string) => {
+    setFilters((prev) => ({
+      ...prev,
+      categoryValues: {
+        ...prev.categoryValues,
+        [filterId]: value,
+      },
+    }));
+  };
+
   const encodeStorageKey = (key: string) =>
     key
       .split("/")
@@ -233,6 +243,44 @@ export default function CategoryPage({ params }: CategoryPageProps) {
           categoryFilters={categoryFilters}
         />
       </div>
+
+      {categoryFilters.length > 0 && (
+        <div className="space-y-3">
+          {categoryFilters.map((filter) => {
+            const activeValue = filters.categoryValues[filter.id] ?? "";
+            return (
+              <div key={filter.id} className="space-y-2">
+                <div className="text-sm font-medium text-foreground/90">
+                  {filter.name}
+                </div>
+                <div className="flex gap-2 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                  <Button
+                    type="button"
+                    variant={activeValue === "" ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setQuickCategoryFilter(filter.id, "")}
+                    className="whitespace-nowrap rounded-full"
+                  >
+                    Все
+                  </Button>
+                  {filter.options.map((option) => (
+                    <Button
+                      key={option}
+                      type="button"
+                      variant={activeValue === option ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => setQuickCategoryFilter(filter.id, option)}
+                      className="whitespace-nowrap rounded-full"
+                    >
+                      {option}
+                    </Button>
+                  ))}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
 
       {filteredProjects && filteredProjects.length > 0 ? (
         <>
