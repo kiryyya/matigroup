@@ -166,14 +166,17 @@ function validateRequiredCategoryFilters(
   values: ProjectFilterValues,
   categoryFilters: CategoryFilterDefinition[],
 ) {
-  const missing = categoryFilters
-    .filter((filter) => filter.required && !values[filter.id])
-    .map((filter) => filter.name);
+  const requiredFilters = categoryFilters.filter((filter) => filter.required);
+  if (requiredFilters.length === 0) {
+    return;
+  }
 
-  if (missing.length > 0) {
-    throw new Error(
-      `Не заполнены обязательные фильтры категории: ${missing.join(", ")}`,
-    );
+  const hasSelectedRequired = requiredFilters.some(
+    (filter) => values[filter.id] && filter.options.includes(values[filter.id]!),
+  );
+
+  if (!hasSelectedRequired) {
+    throw new Error("Выберите одно из обязательных значений фильтра категории");
   }
 }
 

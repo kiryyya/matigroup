@@ -84,6 +84,17 @@ export default function EditProjectModal({ isOpen, onClose, project }: EditProje
     () => selectedCategory?.filters ?? [],
     [selectedCategory?.filters],
   );
+  const categoryFilterChoices = useMemo(
+    () =>
+      categoryFilters.flatMap((filter) =>
+        (filter.options ?? []).map((option, index) => ({
+          key: `${filter.id}-${index}`,
+          filterId: filter.id,
+          value: option,
+        })),
+      ),
+    [categoryFilters],
+  );
 
   // Инициализация значений при открытии
   useEffect(() => {
@@ -102,24 +113,31 @@ export default function EditProjectModal({ isOpen, onClose, project }: EditProje
 
   useEffect(() => {
     setProjectFilterValues((prev) => {
-      const next: ProjectFilterValues = {};
-      for (const filter of categoryFilters) {
-        const value = prev[filter.id];
-        if (value && filter.options.includes(value)) {
-          next[filter.id] = value;
-        }
+      const current = Object.entries(prev).find(([filterId, value]) => {
+        const filter = categoryFilters.find((item) => item.id === filterId);
+        return Boolean(filter && value && filter.options.includes(value));
+      });
+      if (!current) {
+        return {};
       }
-      return next;
+      return { [current[0]]: current[1] };
     });
   }, [selectedCategoryId, categoryFilters]);
 
+  const selectedCategoryFilterKey = useMemo(() => {
+    const selected = Object.entries(projectFilterValues).find(([, value]) => Boolean(value));
+    if (!selected) {
+      return "";
+    }
+    return `${selected[0]}::${selected[1]}`;
+  }, [projectFilterValues]);
+
   const onSubmit = async (data: { title: string; description?: string; content?: string; categoryId: number }) => {
     if (!project) return;
-    const missingRequiredFilters = categoryFilters
-      .filter((filter) => filter.required && !projectFilterValues[filter.id])
-      .map((filter) => filter.name);
-    if (missingRequiredFilters.length > 0) {
-      alert(`Заполните обязательные фильтры: ${missingRequiredFilters.join(", ")}`);
+    const hasRequiredFilters = categoryFilters.some((filter) => filter.required);
+    const hasSelectedFilter = Object.keys(projectFilterValues).length > 0;
+    if (hasRequiredFilters && !hasSelectedFilter) {
+      alert("Выберите одно значение фильтра категории");
       return;
     }
 
@@ -367,37 +385,37 @@ export default function EditProjectModal({ isOpen, onClose, project }: EditProje
               </select>
             </div>
 
-            {categoryFilters.length > 0 && (
+            {categoryFilterChoices.length > 0 && (
               <div className="space-y-3">
-                <Label>Фильтры категории</Label>
-                <div className="space-y-2">
-                  {categoryFilters.map((filter) => (
-                    <div key={filter.id} className="space-y-1">
-                      <Label htmlFor={`project-filter-${filter.id}`}>
-                        {filter.name}
-                        {filter.required ? " *" : ""}
-                      </Label>
-                      <select
-                        id={`project-filter-${filter.id}`}
-                        value={projectFilterValues[filter.id] ?? ""}
-                        onChange={(e) =>
-                          setProjectFilterValues((prev) => ({
-                            ...prev,
-                            [filter.id]: e.target.value,
-                          }))
-                        }
-                        className="w-full p-2 border border-input rounded-md bg-background"
-                      >
-                        <option value="">Выберите значение</option>
-                        {filter.options.map((option) => (
-                          <option key={option} value={option}>
-                            {option}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
+                <Label htmlFor="project-filter-single">
+                  Фильтр категории
+                  {categoryFilters.some((filter) => filter.required) ? " *" : ""}
+                </Label>
+                <select
+                  id="project-filter-single"
+                  value={selectedCategoryFilterKey}
+                  onChange={(e) => {
+                    const next = e.target.value;
+                    if (!next) {
+                      setProjectFilterValues({});
+                      return;
+                    }
+                    const [filterId, value] = next.split("::");
+                    if (!filterId || !value) {
+                      setProjectFilterValues({});
+                      return;
+                    }
+                    setProjectFilterValues({ [filterId]: value });
+                  }}
+                  className="w-full p-2 border border-input rounded-md bg-background"
+                >
+                  <option value="">Выберите значение</option>
+                  {categoryFilterChoices.map((choice) => (
+                    <option key={choice.key} value={`${choice.filterId}::${choice.value}`}>
+                      {choice.value}
+                    </option>
                   ))}
-                </div>
+                </select>
               </div>
             )}
 
