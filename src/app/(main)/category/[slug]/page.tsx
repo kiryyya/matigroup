@@ -64,13 +64,13 @@ export default function CategoryPage({ params }: CategoryPageProps) {
   const quickFilterItems = useMemo(
     () =>
       categoryFilters
-        .map((filter) => {
-          const value = filter.options[0]?.trim() ?? "";
-          return {
+        .flatMap((filter) =>
+          (filter.options ?? []).map((rawValue, index) => ({
+            key: `${filter.id}-${index}`,
             id: filter.id,
-            value,
-          };
-        })
+            value: rawValue.trim(),
+          })),
+        )
         .filter((item) => item.value.length > 0),
     [categoryFilters],
   );
@@ -281,7 +281,7 @@ export default function CategoryPage({ params }: CategoryPageProps) {
             const isActive = activeValue === item.value;
             return (
               <Button
-                key={item.id}
+                key={item.key}
                 type="button"
                 variant={isActive ? "default" : "outline"}
                 size="sm"
