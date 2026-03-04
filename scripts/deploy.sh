@@ -38,6 +38,14 @@ if [ ! -f .env.prod ]; then
   exit 1
 fi
 
+if [ -f scripts/ensure-schema.sh ]; then
+  echo "Running database schema safety patch..."
+  bash scripts/ensure-schema.sh "$DEPLOY_DIR" ".env.prod"
+else
+  echo "scripts/ensure-schema.sh not found. Cannot verify DB schema compatibility."
+  exit 1
+fi
+
 current_version="$(grep '^APP_VERSION=' "$ENV_DEPLOY_FILE" | cut -d'=' -f2- || true)"
 current_image="$(grep '^APP_IMAGE=' "$ENV_DEPLOY_FILE" | cut -d'=' -f2- || true)"
 

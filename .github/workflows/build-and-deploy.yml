@@ -83,6 +83,6 @@ jobs:
             df -h || true
             docker system df || true
             
-            chmod +x scripts/deploy.sh scripts/rollback.sh
+            chmod +x scripts/deploy.sh scripts/rollback.sh scripts/ensure-schema.sh
             ./scripts/deploy.sh "${{ needs.build-and-push.outputs.image_version }}" "${{ needs.build-and-push.outputs.image_name }}"
             docker logs --tail 100 matigroup-app

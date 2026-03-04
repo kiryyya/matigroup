@@ -27,6 +27,7 @@ echo "2. Копирование файлов..."
 scp -i "$SSH_KEY" docker-compose.yml "$SERVER:$DEPLOY_PATH/"
 scp -i "$SSH_KEY" scripts/deploy.sh "$SERVER:$DEPLOY_PATH/scripts/"
 scp -i "$SSH_KEY" scripts/rollback.sh "$SERVER:$DEPLOY_PATH/scripts/"
+scp -i "$SSH_KEY" scripts/ensure-schema.sh "$SERVER:$DEPLOY_PATH/scripts/"
 
 # Создаем .env.deploy из примера
 echo "3. Создание .env.deploy..."
