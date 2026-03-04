@@ -63,8 +63,9 @@ export async function POST(request: NextRequest) {
     const arrayBuffer = await file.arrayBuffer();
     let body = new Uint8Array(arrayBuffer);
     
-    // Если это изображение и это оригинал (не preview), применяем водяной знак
-    if (isImage && variant === "original") {
+    // Для изображений применяем водяной знак к любому варианту (original/preview),
+    // иначе в UI (где часто показывается preview) знак может быть не виден.
+    if (isImage) {
       try {
         // Загружаем настройки водяного знака из БД
         const watermarkSetting = await db.query.settings.findFirst({
