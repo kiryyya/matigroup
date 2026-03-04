@@ -83,6 +83,24 @@ jobs:
             df -h || true
             docker system df || true
 
+            echo "Ensuring DB schema for category filters..."
+            if ! command -v psql >/dev/null 2>&1; then
+              apt-get update && apt-get install -y postgresql-client
+            fi
+
+            db_url="$(grep '^DATABASE_URL=' .env.prod | tail -n1 | cut -d'=' -f2- || true)"
+            if [ -z "$db_url" ]; then
+              echo "DATABASE_URL is missing in .env.prod"
+              exit 1
+            fi
+            db_url="${db_url%\"}"
+            db_url="${db_url#\"}"
+
+            psql "$db_url" -v ON_ERROR_STOP=1 -c "ALTER TABLE \"categories\" ADD COLUMN IF NOT EXISTS \"filters\" json DEFAULT '[]'::json;"
+            psql "$db_url" -v ON_ERROR_STOP=1 -c "ALTER TABLE \"projects\" ADD COLUMN IF NOT EXISTS \"filter_values\" json DEFAULT '{}'::json;"
+            psql "$db_url" -v ON_ERROR_STOP=1 -c "UPDATE \"categories\" SET \"filters\" = '[]'::json WHERE \"filters\" IS NULL;"
+            psql "$db_url" -v ON_ERROR_STOP=1 -c "UPDATE \"projects\" SET \"filter_values\" = '{}'::json WHERE \"filter_values\" IS NULL;"
+
             chmod +x scripts/deploy.sh scripts/rollback.sh
             ./scripts/deploy.sh "${{ needs.build-and-push.outputs.image_version }}" "${{ needs.build-and-push.outputs.image_name }}"
             docker logs --tail 100 matigroup-app
