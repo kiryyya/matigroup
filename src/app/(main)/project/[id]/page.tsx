@@ -7,7 +7,7 @@ import { Button } from "~/components/ui/button";
 import Loader from "~/components/ui/loader";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Calendar, User, Download, Eye, FileText, Image as ImageIcon, FileVideo, FileAudio, Archive, File, Trash2, X, Pencil, Copy, ChevronLeft, ChevronRight } from "lucide-react";
+import { ArrowLeft, Calendar, User, Download, Eye, FileText, Image as ImageIcon, FileVideo, FileAudio, Archive, File, Trash2, X, Pencil, Copy, ChevronLeft, ChevronRight, Maximize2 } from "lucide-react";
 import FavoriteButton from "~/components/favorite-button";
 import { useState, useEffect, useLayoutEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "~/components/ui/dialog";
@@ -36,6 +36,7 @@ export default function ProjectPage({ params }: ProjectPageProps) {
     size?: number;
   } | null>(null);
   const [isEditOpen, setIsEditOpen] = useState(false);
+  const [isImageFullscreenOpen, setIsImageFullscreenOpen] = useState(false);
 
   // Синхронизируем локальное состояние с глобальным для BackButton
   // Используем useLayoutEffect для синхронного обновления
@@ -370,9 +371,10 @@ export default function ProjectPage({ params }: ProjectPageProps) {
                 key={`${displayProject.id}-${currentImageIndex}`}
                 src={getImageCandidates(displayProject.images[currentImageIndex] as StoredImage)[0] ?? ""}
                 alt={`${displayProject.title} - изображение ${currentImageIndex + 1}`}
-                className="w-full h-full object-cover"
+                className="w-full h-full object-cover cursor-zoom-in"
                 loading="eager"
                 decoding="async"
+                onClick={() => setIsImageFullscreenOpen(true)}
                 onLoad={(e) => {
                   // Предотвращаем layout shift после загрузки
                   const target = e.target as HTMLImageElement;
@@ -398,6 +400,15 @@ export default function ProjectPage({ params }: ProjectPageProps) {
               {/* Кнопки навигации (если изображений больше одного) */}
               {displayProject.images.length > 1 && (
                 <>
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    className="absolute left-4 top-4 bg-background/80 hover:bg-background"
+                    onClick={() => setIsImageFullscreenOpen(true)}
+                    title="Открыть на весь экран"
+                  >
+                    <Maximize2 className="h-4 w-4" />
+                  </Button>
                   <Button
                     variant="outline"
                     size="icon"
@@ -592,6 +603,59 @@ export default function ProjectPage({ params }: ProjectPageProps) {
         </Card>
         </div>
       </div>
+
+      {/* Полноэкранный просмотр изображения */}
+      <Dialog open={isImageFullscreenOpen} onOpenChange={setIsImageFullscreenOpen}>
+        <DialogContent className="h-screen w-screen max-w-none border-0 bg-black/95 p-0 sm:rounded-none">
+          <div className="relative flex h-full w-full items-center justify-center">
+            <img
+              src={getImageCandidates(displayProject.images[currentImageIndex] as StoredImage)[0] ?? ""}
+              alt={`${displayProject.title} - полноэкранный просмотр ${currentImageIndex + 1}`}
+              className="h-full w-full object-contain"
+              decoding="async"
+              onError={(e) => {
+                const target = e.target as HTMLImageElement;
+                const image = displayProject.images[currentImageIndex] as StoredImage;
+                const candidates = getImageCandidates(image);
+                const fallbackIndex = Number(target.dataset.fallbackIndex ?? "0");
+                const nextSrc = candidates[fallbackIndex + 1];
+                if (nextSrc) {
+                  target.dataset.fallbackIndex = String(fallbackIndex + 1);
+                  target.src = nextSrc;
+                  return;
+                }
+                target.src = "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAwIiBoZWlnaHQ9IjMwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjMTExMTExIi8+PHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtZmFtaWx5PSJBcmlhbCIgZm9udC1zaXplPSIxNCIgZmlsbD0iI2VlZWVlZSIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZHk9Ii4zZW0iPkltYWdlPC90ZXh0Pjwvc3ZnPg==";
+              }}
+            />
+
+            {displayProject.images.length > 1 && (
+              <>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="absolute left-4 top-1/2 -translate-y-1/2 bg-background/20 text-white hover:bg-background/40 hover:text-white"
+                  onClick={prevImage}
+                >
+                  <ChevronLeft className="h-5 w-5" />
+                </Button>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="absolute right-4 top-1/2 -translate-y-1/2 bg-background/20 text-white hover:bg-background/40 hover:text-white"
+                  onClick={nextImage}
+                >
+                  <ChevronRight className="h-5 w-5" />
+                </Button>
+              </>
+            )}
+
+            <div className="absolute bottom-6 left-1/2 -translate-x-1/2 rounded-full bg-black/60 px-4 py-1.5 text-sm text-white">
+              {currentImageIndex + 1} / {displayProject.images.length}
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       {/* Модальное окно для просмотра файла */}
       <Dialog open={isFileModalOpen} onOpenChange={setIsFileModalOpen}>
         <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden">
