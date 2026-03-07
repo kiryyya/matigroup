@@ -14,6 +14,31 @@ export const dynamic = 'force-dynamic';
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
 const MAX_ATTACHMENT_BYTES = 25 * 1024 * 1024;
 
+type WatermarkConfig = {
+  enabled?: boolean;
+  text?: string;
+  opacity?: number;
+  fontSize?: number;
+  fontSizePercent?: number;
+  color?: { r: number; g: number; b: number };
+  angle?: number;
+  position?: string;
+  useImage?: boolean;
+  watermarkImageKey?: string;
+  imageSizePercent?: number;
+};
+
+const DEFAULT_WATERMARK: Required<
+  Pick<WatermarkConfig, "text" | "opacity" | "color" | "angle" | "position" | "imageSizePercent">
+> = {
+  text: "Matigroup",
+  opacity: 0.15,
+  color: { r: 0, g: 0, b: 0 },
+  angle: -45,
+  position: "center",
+  imageSizePercent: 20,
+};
+
 function sanitizeFileName(name: string) {
   return name.replace(/[^a-zA-Z0-9._-]/g, "_");
 }
@@ -63,89 +88,45 @@ export async function POST(request: NextRequest) {
     const arrayBuffer = await file.arrayBuffer();
     let body = new Uint8Array(arrayBuffer);
     
-    // Для изображений применяем водяной знак к любому варианту (original/preview),
-    // иначе в UI (где часто показывается preview) знак может быть не виден.
+    // Для изображений водяной знак применяем всегда (к original и preview).
     if (isImage) {
       try {
-        // Загружаем настройки водяного знака из БД
         const watermarkSetting = await db.query.settings.findFirst({
           where: eq(settings.key, 'watermark'),
         });
+        const watermarkConfig = (watermarkSetting?.value as WatermarkConfig | undefined) ?? {};
+        const imageBuffer = Buffer.from(body);
 
-        if (watermarkSetting) {
-          const watermarkConfig = watermarkSetting.value as {
-            enabled?: boolean;
-            text?: string;
-            opacity?: number;
-            fontSize?: number;
-            fontSizePercent?: number;
-            color?: { r: number; g: number; b: number };
-            angle?: number;
-            position?: string;
-            useImage?: boolean;
-            watermarkImageKey?: string;
-            imageSizePercent?: number;
-          };
-
-          console.log('Watermark config:', {
-            enabled: watermarkConfig.enabled,
-            useImage: watermarkConfig.useImage,
-            hasImageKey: !!watermarkConfig.watermarkImageKey,
-            hasText: !!watermarkConfig.text,
-          });
-
-          // Применяем водяной знак, если он включен
-          if (watermarkConfig.enabled !== false) {
-            const imageBuffer = Buffer.from(body);
-            
-            // Если используется изображение, загружаем его из storage
-            let watermarkImageBuffer: Buffer | undefined;
-            if (watermarkConfig.useImage && watermarkConfig.watermarkImageKey) {
-              try {
-                const watermarkObject = await getPublicObject({ key: watermarkConfig.watermarkImageKey });
-                if (watermarkObject.Body) {
-                  const watermarkArrayBuffer = await watermarkObject.Body.transformToByteArray();
-                  watermarkImageBuffer = Buffer.from(watermarkArrayBuffer);
-                } else {
-                  console.warn("Изображение водяного знака не найдено в storage, используем текстовый водяной знак");
-                }
-              } catch (error) {
-                console.error("Ошибка загрузки изображения водяного знака:", error);
-                // Продолжаем с текстовым водяным знаком
-              }
+        // Если выбран watermark-логотип, пробуем использовать его; иначе fallback на текстовый.
+        let watermarkImageBuffer: Buffer | undefined;
+        if (watermarkConfig.useImage && watermarkConfig.watermarkImageKey) {
+          try {
+            const watermarkObject = await getPublicObject({ key: watermarkConfig.watermarkImageKey });
+            if (watermarkObject.Body) {
+              watermarkImageBuffer = Buffer.from(await watermarkObject.Body.transformToByteArray());
+            } else {
+              console.warn("Изображение watermark не найдено, fallback на текст");
             }
-            
-            // Определяем, использовать ли изображение или текст
-            // Если useImage=true, но изображение не загрузилось, используем текст
-            const useImageWatermark = watermarkConfig.useImage && watermarkImageBuffer !== undefined;
-            
-            console.log('Applying watermark:', {
-              useImageWatermark,
-              hasImageBuffer: !!watermarkImageBuffer,
-              willUseText: !useImageWatermark,
-            });
-            
-            const watermarkedBuffer = await addWatermarkToImage(imageBuffer, {
-              enabled: watermarkConfig.enabled ?? true,
-              // Если используем изображение, текст не нужен, иначе используем текст
-              text: useImageWatermark ? undefined : (watermarkConfig.text ?? 'Matigroup'),
-              opacity: watermarkConfig.opacity ?? 0.15,
-              fontSize: watermarkConfig.fontSize,
-              fontSizePercent: watermarkConfig.fontSizePercent,
-              color: watermarkConfig.color ?? { r: 0, g: 0, b: 0 },
-              angle: watermarkConfig.angle ?? -45,
-              position: (watermarkConfig.position as any) ?? 'center',
-              imageWatermark: useImageWatermark ? watermarkImageBuffer : undefined,
-              imageSizePercent: watermarkConfig.imageSizePercent ?? 20,
-            });
-            body = new Uint8Array(watermarkedBuffer);
-            console.log('Watermark applied successfully');
-          } else {
-            console.log('Watermark is disabled in config');
+          } catch (error) {
+            console.error("Ошибка загрузки watermark-изображения, fallback на текст:", error);
           }
-        } else {
-          console.log('Watermark settings not found in database');
         }
+
+        const useImageWatermark = watermarkConfig.useImage === true && watermarkImageBuffer !== undefined;
+
+        const watermarkedBuffer = await addWatermarkToImage(imageBuffer, {
+          enabled: true, // Принудительно всегда включен для изображений.
+          text: useImageWatermark ? undefined : (watermarkConfig.text ?? DEFAULT_WATERMARK.text),
+          opacity: watermarkConfig.opacity ?? DEFAULT_WATERMARK.opacity,
+          fontSize: watermarkConfig.fontSize,
+          fontSizePercent: watermarkConfig.fontSizePercent,
+          color: watermarkConfig.color ?? DEFAULT_WATERMARK.color,
+          angle: watermarkConfig.angle ?? DEFAULT_WATERMARK.angle,
+          position: (watermarkConfig.position as any) ?? DEFAULT_WATERMARK.position,
+          imageWatermark: useImageWatermark ? watermarkImageBuffer : undefined,
+          imageSizePercent: watermarkConfig.imageSizePercent ?? DEFAULT_WATERMARK.imageSizePercent,
+        });
+        body = new Uint8Array(watermarkedBuffer);
       } catch (error) {
         console.error("Ошибка при применении водяного знака:", error);
         // Продолжаем с оригинальным изображением в случае ошибки
