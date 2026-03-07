@@ -1,9 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getPublicObject } from "~/lib/storage";
-import { addWatermarkToImage } from "~/lib/watermark";
-import { db } from "~/server/db";
-import { settings } from "~/server/db/schema";
-import { eq } from "drizzle-orm";
 
 // Force dynamic rendering - don't execute during build
 export const dynamic = 'force-dynamic';
@@ -20,30 +16,6 @@ const ALLOWED_IMAGE_MIME_TYPES = new Set([
   "image/gif",
   "image/avif",
 ]);
-
-type WatermarkConfig = {
-  text?: string;
-  opacity?: number;
-  fontSize?: number;
-  fontSizePercent?: number;
-  color?: { r: number; g: number; b: number };
-  angle?: number;
-  position?: "center" | "top-left" | "top-right" | "bottom-left" | "bottom-right" | "repeat";
-  useImage?: boolean;
-  watermarkImageKey?: string;
-  imageSizePercent?: number;
-};
-
-const DEFAULT_WATERMARK: Required<
-  Pick<WatermarkConfig, "text" | "opacity" | "color" | "angle" | "position" | "imageSizePercent">
-> = {
-  text: "Matigroup",
-  opacity: 0.15,
-  color: { r: 0, g: 0, b: 0 },
-  angle: -45,
-  position: "center",
-  imageSizePercent: 20,
-};
 
 function normalizeImageMimeType(contentType?: string): string | null {
   if (!contentType) {
@@ -70,8 +42,8 @@ function buildImageResponse(
     status: 200,
     headers: {
       "Content-Type": contentType,
-      // Keep cache short to roll out watermark changes faster.
-      "Cache-Control": "public, max-age=300, s-maxage=300, stale-while-revalidate=3600",
+      // Cache successful image responses to avoid repeated S3/proxy hops.
+      "Cache-Control": "public, max-age=86400, s-maxage=86400, stale-while-revalidate=604800",
       "Content-Length": bodyBuffer.length.toString(),
       "X-Content-Type-Options": "nosniff",
       "Content-Disposition": "inline",
@@ -91,57 +63,6 @@ async function convertToJpeg(bodyBuffer: Buffer): Promise<Buffer | null> {
     return await sharp(bodyBuffer).jpeg({ quality: 82 }).toBuffer();
   } catch {
     return null;
-  }
-}
-
-async function getWatermarkConfig(): Promise<WatermarkConfig> {
-  try {
-    const watermarkSetting = await db.query.settings.findFirst({
-      where: eq(settings.key, "watermark"),
-    });
-    return (watermarkSetting?.value as WatermarkConfig | undefined) ?? {};
-  } catch (error) {
-    console.error("Failed to load watermark config:", error);
-    return {};
-  }
-}
-
-async function resolveWatermarkImageBuffer(config: WatermarkConfig): Promise<Buffer | undefined> {
-  if (!config.useImage || !config.watermarkImageKey) {
-    return undefined;
-  }
-
-  try {
-    const watermarkObject = await getPublicObject({ key: config.watermarkImageKey });
-    if (!watermarkObject.Body) return undefined;
-    return Buffer.from(await watermarkObject.Body.transformToByteArray());
-  } catch (error) {
-    console.error("Failed to load watermark image, falling back to text:", error);
-    return undefined;
-  }
-}
-
-async function applyWatermark(bodyBuffer: Buffer): Promise<Buffer> {
-  try {
-    const config = await getWatermarkConfig();
-    const watermarkImage = await resolveWatermarkImageBuffer(config);
-    const useImageWatermark = config.useImage === true && watermarkImage !== undefined;
-
-    return await addWatermarkToImage(bodyBuffer, {
-      enabled: true,
-      text: useImageWatermark ? undefined : (config.text ?? DEFAULT_WATERMARK.text),
-      opacity: config.opacity ?? DEFAULT_WATERMARK.opacity,
-      fontSize: config.fontSize,
-      fontSizePercent: config.fontSizePercent,
-      color: config.color ?? DEFAULT_WATERMARK.color,
-      angle: config.angle ?? DEFAULT_WATERMARK.angle,
-      position: config.position ?? DEFAULT_WATERMARK.position,
-      imageWatermark: useImageWatermark ? watermarkImage : undefined,
-      imageSizePercent: config.imageSizePercent ?? DEFAULT_WATERMARK.imageSizePercent,
-    });
-  } catch (error) {
-    console.error("Failed to apply watermark in image proxy:", error);
-    return bodyBuffer;
   }
 }
 
@@ -165,11 +86,7 @@ async function resolveImagePayload(s3Object: Awaited<ReturnType<typeof getPublic
   if (!contentType) {
     return null;
   }
-
-  // Enforce watermark at response-time for all images, including legacy uploads.
-  const watermarkedBuffer = await applyWatermark(bodyBuffer);
-
-  return { bodyBuffer: watermarkedBuffer, contentType };
+  return { bodyBuffer, contentType };
 }
 
 export async function GET(
