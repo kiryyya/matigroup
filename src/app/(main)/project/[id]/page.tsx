@@ -348,10 +348,12 @@ export default function ProjectPage({ params }: ProjectPageProps) {
     return key;
   };
 
-  const getImageCandidates = (image: StoredImage) => {
+  const getImageCandidates = (image: StoredImage, preferPreview = false) => {
+    const primary = preferPreview
+      ? [image?.previewUrl ?? "", image?.url ?? ""]
+      : [image?.url ?? "", image?.previewUrl ?? ""];
     const candidates = [
-      image?.previewUrl ?? "",
-      image?.url ?? "",
+      ...primary,
       image?.key ? buildImageProxyUrl(image.key) : "",
       image?.key ? buildImageProxyUrl(getPreviewKey(image.key)) : "",
     ].filter(Boolean);
