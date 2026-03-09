@@ -25,6 +25,7 @@ interface ProjectPageProps {
 export default function ProjectPage({ params }: ProjectPageProps) {
   const { data: user } = api.tg.getUser.useQuery();
   const { setIsFileModalOpen: setGlobalFileModalOpen } = useModal();
+  const [isArchiveDownloading, setIsArchiveDownloading] = useState(false);
   
   // Состояния для модального окна файла
   const [isFileModalOpen, setIsFileModalOpen] = useState(false);
@@ -274,6 +275,45 @@ export default function ProjectPage({ params }: ProjectPageProps) {
     }
   };
 
+  const downloadProjectArchive = async () => {
+    if (!displayProject) return;
+    try {
+      setIsArchiveDownloading(true);
+      const initData = window.Telegram?.WebApp?.initData ?? "";
+      const response = await fetch(`/api/projects/${displayProject.id}/archive`, {
+        headers: {
+          "x-telegram-init-data": initData,
+        },
+      });
+
+      if (!response.ok) {
+        const rawText = await response.text();
+        let serverMessage = rawText;
+        try {
+          const parsed = JSON.parse(rawText) as { error?: string };
+          serverMessage = parsed.error ?? rawText;
+        } catch {
+          // keep raw text
+        }
+        throw new Error(serverMessage || `HTTP ${response.status}`);
+      }
+
+      const blob = await response.blob();
+      const safeTitle = (displayProject.title || `project_${displayProject.id}`)
+        .replace(/[\\/:*?"<>|]/g, "_")
+        .trim();
+      downloadBlob(blob, `${safeTitle || `project_${displayProject.id}`}.zip`);
+    } catch (error) {
+      console.error("Ошибка скачивания архива проекта:", error);
+      alert(
+        "Ошибка при скачивании архива: " +
+          (error instanceof Error ? error.message : String(error)),
+      );
+    } finally {
+      setIsArchiveDownloading(false);
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="flex h-full w-full items-center justify-center">
@@ -475,6 +515,18 @@ export default function ProjectPage({ params }: ProjectPageProps) {
             </div>
             <div className="flex gap-2 flex-shrink-0">
               <FavoriteButton projectId={displayProject.id} />
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  void downloadProjectArchive();
+                }}
+                disabled={isArchiveDownloading}
+                title="Скачать все изображения и вложения одним архивом"
+              >
+                <Archive className="h-4 w-4 mr-2" />
+                {isArchiveDownloading ? "Скачивание..." : "Скачать архив"}
+              </Button>
               <Button
                 variant="outline"
                 size="sm"
