@@ -347,15 +347,28 @@ export default function ProjectPage({ params }: ProjectPageProps) {
         }
       }
 
-      // Fallback для Telegram WebView: прямой endpoint с attachment.
-      // Blob URL в WebView часто открывается как "Открыть blob", а не загрузка.
-      const directLink = document.createElement("a");
-      directLink.href = archiveUrl;
-      directLink.style.display = "none";
-      directLink.rel = "noopener";
-      document.body.appendChild(directLink);
-      directLink.click();
-      document.body.removeChild(directLink);
+      // Fallback: пытаемся открыть во внешнем браузере, где обычно доступен Save As.
+      const absoluteArchiveUrl =
+        archiveUrl.startsWith("http") ? archiveUrl : `${window.location.origin}${archiveUrl}`;
+      const tgWebApp = window.Telegram?.WebApp as
+        | (typeof window.Telegram.WebApp & {
+            openLink?: (url: string, options?: Record<string, unknown>) => void;
+          })
+        | undefined;
+
+      if (tgWebApp?.openLink) {
+        try {
+          tgWebApp.openLink(absoluteArchiveUrl, { try_browser: "chrome" });
+          return;
+        } catch (openLinkError) {
+          console.warn("Telegram openLink failed, fallback to window.open:", openLinkError);
+        }
+      }
+
+      const opened = window.open(absoluteArchiveUrl, "_blank", "noopener,noreferrer");
+      if (!opened) {
+        window.location.href = absoluteArchiveUrl;
+      }
     } catch (error) {
       console.error("Ошибка скачивания архива проекта:", error);
       alert(
