@@ -109,7 +109,15 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       console.warn("CSRF warning for archive download:", csrfError);
     }
 
-    const user = await requireTelegramUser(request.headers);
+    const authHeaders = new Headers(request.headers);
+    if (!authHeaders.get("x-telegram-init-data")) {
+      const initDataFromQuery = request.nextUrl.searchParams.get("initData");
+      if (initDataFromQuery) {
+        authHeaders.set("x-telegram-init-data", initDataFromQuery);
+      }
+    }
+
+    const user = await requireTelegramUser(authHeaders);
     const project = await db.query.projects.findFirst({
       where:
         user.role === "admin"

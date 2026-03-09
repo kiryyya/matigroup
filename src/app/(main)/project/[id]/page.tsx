@@ -280,29 +280,13 @@ export default function ProjectPage({ params }: ProjectPageProps) {
     try {
       setIsArchiveDownloading(true);
       const initData = window.Telegram?.WebApp?.initData ?? "";
-      const response = await fetch(`/api/projects/${displayProject.id}/archive`, {
-        headers: {
-          "x-telegram-init-data": initData,
-        },
-      });
-
-      if (!response.ok) {
-        const rawText = await response.text();
-        let serverMessage = rawText;
-        try {
-          const parsed = JSON.parse(rawText) as { error?: string };
-          serverMessage = parsed.error ?? rawText;
-        } catch {
-          // keep raw text
-        }
-        throw new Error(serverMessage || `HTTP ${response.status}`);
-      }
-
-      const blob = await response.blob();
       const safeTitle = (displayProject.title || `project_${displayProject.id}`)
         .replace(/[\\/:*?"<>|]/g, "_")
         .trim();
       const archiveFileName = `${safeTitle || `project_${displayProject.id}`}.zip`;
+      const archiveUrl = `/api/projects/${displayProject.id}/archive${
+        initData ? `?initData=${encodeURIComponent(initData)}` : ""
+      }`;
 
       const windowWithSavePicker = window as Window & {
         showSaveFilePicker?: (options: unknown) => Promise<{
@@ -315,6 +299,25 @@ export default function ProjectPage({ params }: ProjectPageProps) {
 
       if (typeof windowWithSavePicker.showSaveFilePicker === "function") {
         try {
+          const response = await fetch(`/api/projects/${displayProject.id}/archive`, {
+            headers: {
+              "x-telegram-init-data": initData,
+            },
+          });
+
+          if (!response.ok) {
+            const rawText = await response.text();
+            let serverMessage = rawText;
+            try {
+              const parsed = JSON.parse(rawText) as { error?: string };
+              serverMessage = parsed.error ?? rawText;
+            } catch {
+              // keep raw text
+            }
+            throw new Error(serverMessage || `HTTP ${response.status}`);
+          }
+
+          const blob = await response.blob();
           const fileHandle = await windowWithSavePicker.showSaveFilePicker({
             suggestedName: archiveFileName,
             types: [
@@ -344,7 +347,15 @@ export default function ProjectPage({ params }: ProjectPageProps) {
         }
       }
 
-      downloadBlob(blob, archiveFileName);
+      // Fallback для Telegram WebView: прямой endpoint с attachment.
+      // Blob URL в WebView часто открывается как "Открыть blob", а не загрузка.
+      const directLink = document.createElement("a");
+      directLink.href = archiveUrl;
+      directLink.style.display = "none";
+      directLink.rel = "noopener";
+      document.body.appendChild(directLink);
+      directLink.click();
+      document.body.removeChild(directLink);
     } catch (error) {
       console.error("Ошибка скачивания архива проекта:", error);
       alert(
