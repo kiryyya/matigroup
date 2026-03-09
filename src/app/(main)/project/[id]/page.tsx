@@ -347,28 +347,17 @@ export default function ProjectPage({ params }: ProjectPageProps) {
         }
       }
 
-      // Fallback: пытаемся открыть во внешнем браузере, где обычно доступен Save As.
+      // Fallback: ссылка с download — в WebView часто открывается системное окно сохранения.
       const absoluteArchiveUrl =
         archiveUrl.startsWith("http") ? archiveUrl : `${window.location.origin}${archiveUrl}`;
-      const tgWebApp = window.Telegram?.WebApp as
-        | (typeof window.Telegram.WebApp & {
-            openLink?: (url: string, options?: Record<string, unknown>) => void;
-          })
-        | undefined;
-
-      if (tgWebApp?.openLink) {
-        try {
-          tgWebApp.openLink(absoluteArchiveUrl, { try_browser: "chrome" });
-          return;
-        } catch (openLinkError) {
-          console.warn("Telegram openLink failed, fallback to window.open:", openLinkError);
-        }
-      }
-
-      const opened = window.open(absoluteArchiveUrl, "_blank", "noopener,noreferrer");
-      if (!opened) {
-        window.location.href = absoluteArchiveUrl;
-      }
+      const a = document.createElement("a");
+      a.href = absoluteArchiveUrl;
+      a.download = archiveFileName;
+      a.rel = "noopener";
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      toast.success("Скачивание архива запущено");
     } catch (error) {
       console.error("Ошибка скачивания архива проекта:", error);
       alert(
@@ -728,11 +717,15 @@ export default function ProjectPage({ params }: ProjectPageProps) {
       <Dialog open={isImageFullscreenOpen} onOpenChange={setIsImageFullscreenOpen}>
         <DialogContent className="h-screen w-screen max-w-none border-0 bg-black/95 p-0 sm:rounded-none">
           <div className="relative flex h-full w-full items-center justify-center">
+            {/* Не блокируем contextmenu и touch-callout — чтобы при долгом нажатии работали «Скопировать» / «Сохранить» */}
             <img
               src={getImageCandidates(displayProject.images[currentImageIndex] as StoredImage)[0] ?? ""}
               alt={`${displayProject.title} - полноэкранный просмотр ${currentImageIndex + 1}`}
               className="h-full w-full object-contain"
               decoding="async"
+              draggable
+              style={{ WebkitTouchCallout: "default", touchAction: "manipulation" }}
+              onContextMenu={(e) => e.stopPropagation()}
               onError={(e) => {
                 const target = e.target as HTMLImageElement;
                 const image = displayProject.images[currentImageIndex] as StoredImage;
