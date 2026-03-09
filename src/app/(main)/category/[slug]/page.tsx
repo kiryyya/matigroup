@@ -107,10 +107,12 @@ export default function CategoryPage({ params }: CategoryPageProps) {
 
     let filtered = [...projects];
 
-    // Поиск по названию
+    // Поиск по названию и описанию
     if (filters.searchQuery) {
+      const normalizedQuery = filters.searchQuery.toLowerCase();
       filtered = filtered.filter(project =>
-        project.title.toLowerCase().includes(filters.searchQuery.toLowerCase())
+        project.title.toLowerCase().includes(normalizedQuery) ||
+        (project.description ?? "").toLowerCase().includes(normalizedQuery)
       );
     }
 
@@ -240,7 +242,7 @@ export default function CategoryPage({ params }: CategoryPageProps) {
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
           <Input
-            placeholder="Поиск по названию проекта..."
+            placeholder="Поиск по названию и описанию..."
             value={filters.searchQuery}
             onChange={(e) => setFilters(prev => ({ ...prev, searchQuery: e.target.value }))}
             className="pl-10 pr-10"
