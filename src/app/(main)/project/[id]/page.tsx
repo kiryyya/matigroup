@@ -302,7 +302,49 @@ export default function ProjectPage({ params }: ProjectPageProps) {
       const safeTitle = (displayProject.title || `project_${displayProject.id}`)
         .replace(/[\\/:*?"<>|]/g, "_")
         .trim();
-      downloadBlob(blob, `${safeTitle || `project_${displayProject.id}`}.zip`);
+      const archiveFileName = `${safeTitle || `project_${displayProject.id}`}.zip`;
+
+      const windowWithSavePicker = window as Window & {
+        showSaveFilePicker?: (options: unknown) => Promise<{
+          createWritable: () => Promise<{
+            write: (data: Blob) => Promise<void>;
+            close: () => Promise<void>;
+          }>;
+        }>;
+      };
+
+      if (typeof windowWithSavePicker.showSaveFilePicker === "function") {
+        try {
+          const fileHandle = await windowWithSavePicker.showSaveFilePicker({
+            suggestedName: archiveFileName,
+            types: [
+              {
+                description: "ZIP archive",
+                accept: {
+                  "application/zip": [".zip"],
+                },
+              },
+            ],
+          });
+          const writable = await fileHandle.createWritable();
+          await writable.write(blob);
+          await writable.close();
+          toast.success("Архив сохранен");
+          return;
+        } catch (pickerError) {
+          const errorName =
+            pickerError && typeof pickerError === "object" && "name" in pickerError
+              ? String((pickerError as { name?: string }).name)
+              : "";
+          // Пользователь отменил диалог выбора файла.
+          if (errorName === "AbortError") {
+            return;
+          }
+          console.warn("showSaveFilePicker недоступен или завершился ошибкой, fallback:", pickerError);
+        }
+      }
+
+      downloadBlob(blob, archiveFileName);
     } catch (error) {
       console.error("Ошибка скачивания архива проекта:", error);
       alert(
