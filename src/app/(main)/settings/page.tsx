@@ -4,7 +4,7 @@ import { api } from "~/trpc/react";
 import { Card, CardContent } from "~/components/ui/card";
 import Loader from "~/components/ui/loader";
 import Link from "next/link";
-import { Search, Plus, Image as ImageIcon, ChevronRight, Folder } from "lucide-react";
+import { Search, Plus, Image as ImageIcon, ChevronRight, Folder, MessageCircle } from "lucide-react";
 
 export default function Settings() {
   const { data: user, isLoading } = api.tg.getUser.useQuery();
@@ -44,6 +44,13 @@ export default function Settings() {
       description: "Настройте параметры водяного знака для изображений",
       href: "/settings/watermark",
       icon: ImageIcon,
+      adminOnly: true,
+    },
+    {
+      title: "Получатель обратной связи",
+      description: "Укажите Telegram username для получения сообщений из формы обратной связи",
+      href: "/settings/feedback",
+      icon: MessageCircle,
       adminOnly: true,
     },
     // {

@@ -152,6 +152,8 @@ export const POST = async (req: Request) => {
 async function checkChatId(ctx: Context) {
   const chatId = ctx.chat?.id;
   const userId = ctx.from?.id;
+  const username = ctx.from?.username?.trim() || null;
+  const name = [ctx.from?.first_name, ctx.from?.last_name].filter(Boolean).join(" ").trim();
 
   if (!chatId || !userId) {
     return;
@@ -165,14 +167,21 @@ async function checkChatId(ctx: Context) {
     await db.insert(users).values({
       telegramId: userId.toString(),
       chatId: chatId.toString(),
-      name: ctx.from.first_name,
+      name: name || ctx.from?.first_name || null,
+      username,
     });
   } else {
-    if (user.chatId !== chatId.toString()) {
+    if (
+      user.chatId !== chatId.toString() ||
+      user.username !== username ||
+      (name && user.name !== name)
+    ) {
       await db
         .update(users)
         .set({
           chatId: chatId.toString(),
+          username,
+          ...(name ? { name } : {}),
         })
         .where(eq(users.id, user.id));
     }

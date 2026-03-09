@@ -68,6 +68,7 @@ export default function CreateProjectModal({ isOpen, onClose }: CreateProjectMod
   const [isProcessingImages, setIsProcessingImages] = useState(false);
   const [uploadCount, setUploadCount] = useState(0);
   const [projectFilterValues, setProjectFilterValues] = useState<ProjectFilterValues>({});
+  const contentRef = React.useRef<HTMLDivElement | null>(null);
 
   const isUploadingFiles = uploadCount > 0;
   const startUpload = () => setUploadCount((count) => count + 1);
@@ -79,6 +80,7 @@ export default function CreateProjectModal({ isOpen, onClose }: CreateProjectMod
     reset,
     watch,
   } = useForm<ProjectFormData>();
+  const categoryField = register("categoryId", { valueAsNumber: true });
 
   const selectedCategoryId = watch("categoryId");
   const selectedCategory = categories?.find((category) => category.id === selectedCategoryId);
@@ -118,6 +120,20 @@ export default function CreateProjectModal({ isOpen, onClose }: CreateProjectMod
     }
     return `${selected[0]}::${selected[1]}`;
   }, [projectFilterValues]);
+
+  const preserveScrollPosition = (update: () => void) => {
+    const modalScrollTop = contentRef.current?.scrollTop ?? 0;
+    const pageScrollTop = window.scrollY;
+    update();
+    requestAnimationFrame(() => {
+      if (contentRef.current) {
+        contentRef.current.scrollTop = modalScrollTop;
+      }
+      if (window.scrollY !== pageScrollTop) {
+        window.scrollTo({ top: pageScrollTop });
+      }
+    });
+  };
 
   const onSubmit = async (data: ProjectFormData) => {
     // Простая валидация
@@ -395,7 +411,10 @@ export default function CreateProjectModal({ isOpen, onClose }: CreateProjectMod
 
   return (
     <Dialog open={isOpen}>
-      <CustomDialogContent className="max-w-2xl max-h-full overflow-y-auto pt-28 pb-20">
+      <CustomDialogContent
+        ref={contentRef}
+        className="max-w-2xl max-h-full overflow-y-auto pt-28 pb-20"
+      >
         <DialogHeader>
           <DialogTitle>Создать новый проект</DialogTitle>
           <DialogDescription>
@@ -441,7 +460,14 @@ export default function CreateProjectModal({ isOpen, onClose }: CreateProjectMod
             <Label htmlFor="category">Категория *</Label>
             <select
               id="category"
-              {...register("categoryId", { valueAsNumber: true })}
+              name={categoryField.name}
+              ref={categoryField.ref}
+              onBlur={categoryField.onBlur}
+              onChange={(e) =>
+                preserveScrollPosition(() => {
+                  categoryField.onChange(e);
+                })
+              }
               className="w-full p-2 border border-input rounded-md bg-background"
             >
               <option value="">Выберите категорию</option>
@@ -463,17 +489,19 @@ export default function CreateProjectModal({ isOpen, onClose }: CreateProjectMod
                 id="category-filter-single"
                 value={selectedCategoryFilterKey}
                 onChange={(e) => {
-                  const next = e.target.value;
-                  if (!next) {
-                    setProjectFilterValues({});
-                    return;
-                  }
-                  const [filterId, value] = next.split("::");
-                  if (!filterId || !value) {
-                    setProjectFilterValues({});
-                    return;
-                  }
-                  setProjectFilterValues({ [filterId]: value });
+                  preserveScrollPosition(() => {
+                    const next = e.target.value;
+                    if (!next) {
+                      setProjectFilterValues({});
+                      return;
+                    }
+                    const [filterId, value] = next.split("::");
+                    if (!filterId || !value) {
+                      setProjectFilterValues({});
+                      return;
+                    }
+                    setProjectFilterValues({ [filterId]: value });
+                  });
                 }}
                 className="w-full p-2 border border-input rounded-md bg-background"
               >
