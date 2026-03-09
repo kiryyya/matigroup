@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { and, eq, ilike, isNotNull } from "drizzle-orm";
+import { eq, ilike } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "~/server/db";
 import { settings, users } from "~/server/db/schema";
@@ -70,13 +70,14 @@ export async function POST(request: NextRequest) {
     let targetChatId: string | null = null;
 
     const targetUser = await db.query.users.findFirst({
-      where: and(ilike(users.username, normalizedTargetUsername), isNotNull(users.chatId)),
+      where: ilike(users.username, normalizedTargetUsername),
       columns: {
         chatId: true,
+        telegramId: true,
       },
     });
-    if (targetUser?.chatId) {
-      targetChatId = targetUser.chatId;
+    if (targetUser?.chatId || targetUser?.telegramId) {
+      targetChatId = targetUser.chatId ?? targetUser.telegramId ?? null;
     }
 
     // Fallback: ask Telegram API directly by username if DB username was not synced yet.
