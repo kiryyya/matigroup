@@ -57,6 +57,7 @@ export default function CategoriesSettingsPage() {
 
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [editingCategory, setEditingCategory] = useState<number | null>(null);
+  const [isBackgroundUploading, setIsBackgroundUploading] = useState(false);
   const [formData, setFormData] = useState({
     name: "",
     slug: "",
@@ -182,6 +183,60 @@ export default function CategoriesSettingsPage() {
     } catch (error) {
       console.error("Ошибка удаления категории:", error);
       alert(error instanceof Error ? error.message : "Ошибка удаления категории");
+    }
+  };
+
+  const handleBackgroundUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith("image/")) {
+      alert("Выберите файл изображения");
+      return;
+    }
+
+    try {
+      setIsBackgroundUploading(true);
+      const payload = new FormData();
+      payload.append("file", file);
+      payload.append("kind", "image");
+      payload.append("variant", "original");
+      payload.append("skipWatermark", "true");
+
+      const initData =
+        typeof window !== "undefined"
+          ? window.Telegram?.WebApp?.initData ?? ""
+          : "";
+
+      const response = await fetch("/api/upload", {
+        method: "POST",
+        headers: {
+          "x-telegram-init-data": initData,
+        },
+        body: payload,
+      });
+
+      if (!response.ok) {
+        const text = await response.text();
+        throw new Error(text || "Не удалось загрузить изображение");
+      }
+
+      const uploaded = (await response.json()) as { url?: string };
+      if (!uploaded.url) {
+        throw new Error("Сервис не вернул URL изображения");
+      }
+
+      setFormData((prev) => ({
+        ...prev,
+        backgroundImage: uploaded.url!,
+      }));
+    } catch (error) {
+      console.error("Ошибка загрузки фона категории:", error);
+      alert(error instanceof Error ? error.message : "Ошибка загрузки изображения");
+    } finally {
+      setIsBackgroundUploading(false);
+      // Позволяем загрузить тот же файл повторно при необходимости.
+      e.target.value = "";
     }
   };
 
@@ -411,17 +466,37 @@ export default function CategoriesSettingsPage() {
               </div>
             </div>
 
-            <div>
-              <Label htmlFor="backgroundImage">URL фонового изображения</Label>
+            <div className="space-y-2">
+              <Label htmlFor="backgroundImageUpload">Фоновое изображение категории</Label>
               <Input
-                id="backgroundImage"
-                type="url"
-                value={formData.backgroundImage}
-                onChange={(e) => setFormData({ ...formData, backgroundImage: e.target.value })}
-                placeholder="https://example.com/image.jpg"
+                id="backgroundImageUpload"
+                type="file"
+                accept="image/*"
+                onChange={handleBackgroundUpload}
+                disabled={isBackgroundUploading}
               />
+              {isBackgroundUploading && (
+                <p className="text-xs text-muted-foreground">Загрузка изображения...</p>
+              )}
+              {formData.backgroundImage && (
+                <div className="space-y-2">
+                  <img
+                    src={formData.backgroundImage}
+                    alt="Фон категории"
+                    className="h-28 w-full rounded-md border object-cover"
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setFormData({ ...formData, backgroundImage: "" })}
+                  >
+                    Удалить изображение
+                  </Button>
+                </div>
+              )}
               <p className="text-xs text-muted-foreground mt-1">
-                Изображение будет использоваться как фон на главной странице
+                Изображение загружается из устройства и используется как фон на главной странице (без водяного знака).
               </p>
             </div>
 

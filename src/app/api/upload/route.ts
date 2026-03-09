@@ -71,6 +71,7 @@ export async function POST(request: NextRequest) {
     const file = formData.get("file") as File | null;
     const kind = (formData.get("kind") as string | null) ?? "attachment";
     const variant = (formData.get("variant") as string | null) ?? "original";
+    const skipWatermark = (formData.get("skipWatermark") as string | null) === "true";
 
     if (!file) {
       return NextResponse.json({ error: "File is required" }, { status: 400 });
@@ -88,8 +89,9 @@ export async function POST(request: NextRequest) {
     const arrayBuffer = await file.arrayBuffer();
     let body = new Uint8Array(arrayBuffer);
     
-    // Для изображений водяной знак применяем всегда (к original и preview).
-    if (isImage) {
+    // Для изображений водяной знак применяем всегда (к original и preview),
+    // кроме явно помеченных служебных загрузок (например, фон категории).
+    if (isImage && !skipWatermark) {
       try {
         const watermarkSetting = await db.query.settings.findFirst({
           where: eq(settings.key, 'watermark'),

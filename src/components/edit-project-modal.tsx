@@ -72,12 +72,14 @@ export default function EditProjectModal({ isOpen, onClose, project }: EditProje
   const [saveStatus, setSaveStatus] = useState("");
   const [uploadCount, setUploadCount] = useState(0);
   const [projectFilterValues, setProjectFilterValues] = useState<ProjectFilterValues>({});
+  const contentRef = React.useRef<HTMLDivElement | null>(null);
 
   const isUploadingFiles = uploadCount > 0;
   const startUpload = () => setUploadCount((count) => count + 1);
   const endUpload = () => setUploadCount((count) => Math.max(0, count - 1));
 
   const { register, handleSubmit, reset, watch } = useForm<{ title: string; description?: string; content?: string; categoryId: number }>();
+  const categoryField = register("categoryId", { valueAsNumber: true });
   const selectedCategoryId = watch("categoryId");
   const selectedCategory = categories?.find((category) => category.id === selectedCategoryId);
   const categoryFilters = useMemo(
@@ -131,6 +133,20 @@ export default function EditProjectModal({ isOpen, onClose, project }: EditProje
     }
     return `${selected[0]}::${selected[1]}`;
   }, [projectFilterValues]);
+
+  const preserveScrollPosition = (update: () => void) => {
+    const modalScrollTop = contentRef.current?.scrollTop ?? 0;
+    const pageScrollTop = window.scrollY;
+    update();
+    requestAnimationFrame(() => {
+      if (contentRef.current) {
+        contentRef.current.scrollTop = modalScrollTop;
+      }
+      if (window.scrollY !== pageScrollTop) {
+        window.scrollTo({ top: pageScrollTop });
+      }
+    });
+  };
 
   const onSubmit = async (data: { title: string; description?: string; content?: string; categoryId: number }) => {
     if (!project) return;
@@ -344,7 +360,10 @@ export default function EditProjectModal({ isOpen, onClose, project }: EditProje
 
   return (
     <Dialog open={isOpen}>
-      <CustomDialogContent className="max-w-2xl max-h-full overflow-y-auto pt-28 pb-4">
+      <CustomDialogContent
+        ref={contentRef}
+        className="max-w-2xl max-h-full overflow-y-auto pt-28 pb-4"
+      >
         <DialogHeader>
           <DialogTitle>Редактировать проект</DialogTitle>
           <DialogDescription>
@@ -373,7 +392,14 @@ export default function EditProjectModal({ isOpen, onClose, project }: EditProje
               <Label htmlFor="category">Категория *</Label>
               <select
                 id="category"
-                {...register("categoryId", { valueAsNumber: true })}
+                name={categoryField.name}
+                ref={categoryField.ref}
+                onBlur={categoryField.onBlur}
+                onChange={(e) =>
+                  preserveScrollPosition(() => {
+                    categoryField.onChange(e);
+                  })
+                }
                 className="w-full p-2 border border-input rounded-md bg-background"
               >
                 <option value="">Выберите категорию</option>
@@ -395,17 +421,19 @@ export default function EditProjectModal({ isOpen, onClose, project }: EditProje
                   id="project-filter-single"
                   value={selectedCategoryFilterKey}
                   onChange={(e) => {
-                    const next = e.target.value;
-                    if (!next) {
-                      setProjectFilterValues({});
-                      return;
-                    }
-                    const [filterId, value] = next.split("::");
-                    if (!filterId || !value) {
-                      setProjectFilterValues({});
-                      return;
-                    }
-                    setProjectFilterValues({ [filterId]: value });
+                    preserveScrollPosition(() => {
+                      const next = e.target.value;
+                      if (!next) {
+                        setProjectFilterValues({});
+                        return;
+                      }
+                      const [filterId, value] = next.split("::");
+                      if (!filterId || !value) {
+                        setProjectFilterValues({});
+                        return;
+                      }
+                      setProjectFilterValues({ [filterId]: value });
+                    });
                   }}
                   className="w-full p-2 border border-input rounded-md bg-background"
                 >

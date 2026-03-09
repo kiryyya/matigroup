@@ -52,14 +52,7 @@ export default function Settings() {
       href: "/settings/feedback",
       icon: MessageCircle,
       adminOnly: true,
-    },
-    // {
-    //   title: "Диагностика изображений",
-    //   description: "Проверка key в S3 и поведения /api/images без DevTools",
-    //   href: "/settings/image-debug",
-    //   icon: Bug,
-    //   adminOnly: true,
-    // },
+    }
   ].filter(item => !item.adminOnly || user?.role === "admin");
 
   return (
