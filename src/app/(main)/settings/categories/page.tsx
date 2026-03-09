@@ -123,8 +123,8 @@ export default function CategoriesSettingsPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!formData.name.trim() || !formData.slug.trim()) {
-      alert("Название и slug обязательны");
+    if (!formData.name.trim()) {
+      alert("Название обязательно");
       return;
     }
 
@@ -148,7 +148,7 @@ export default function CategoriesSettingsPage() {
         await updateCategory.mutateAsync({
           id: editingCategory,
           name: formData.name,
-          slug: formData.slug,
+          slug: formData.slug.trim() || undefined,
           description: formData.description || undefined,
           icon: formData.icon || undefined,
           color: formData.color || undefined,
@@ -158,7 +158,7 @@ export default function CategoriesSettingsPage() {
       } else {
         await createCategory.mutateAsync({
           name: formData.name,
-          slug: formData.slug,
+          slug: formData.slug.trim() || undefined,
           description: formData.description || undefined,
           icon: formData.icon || undefined,
           color: formData.color || undefined,
@@ -358,17 +358,15 @@ export default function CategoriesSettingsPage() {
             </div>
 
             <div>
-              <Label htmlFor="slug">Slug *</Label>
+              <Label htmlFor="slug">Slug (опционально)</Label>
               <Input
                 id="slug"
                 value={formData.slug}
-                onChange={(e) => setFormData({ ...formData, slug: e.target.value.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '') })}
-                placeholder="Например: real-estate"
-                required
-                pattern="[a-z0-9-]+"
+                onChange={(e) => setFormData({ ...formData, slug: e.target.value })}
+                placeholder="Можно оставить пустым"
               />
               <p className="text-xs text-muted-foreground mt-1">
-                Только строчные буквы, цифры и дефисы
+                Если оставить пустым, slug сгенерируется автоматически из названия (транслитерация)
               </p>
             </div>
 
