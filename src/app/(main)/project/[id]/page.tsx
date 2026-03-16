@@ -611,6 +611,7 @@ export default function ProjectPage({ params }: ProjectPageProps) {
                 <Archive className="h-4 w-4 mr-2" />
                 {isArchiveDownloading ? "Скачивание..." : "Скачать архив"}
               </Button>
+              {/*
               {user?.role === "admin" && (
                 <Button
                   variant="outline"
@@ -626,6 +627,7 @@ export default function ProjectPage({ params }: ProjectPageProps) {
                   {isArchiveDownloading ? "Скачивание..." : "Без водяного знака"}
                 </Button>
               )}
+              */}
               <Button
                 variant="outline"
                 size="sm"
