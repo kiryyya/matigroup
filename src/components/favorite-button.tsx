@@ -3,13 +3,21 @@
 import { Heart } from "lucide-react";
 import { api } from "~/trpc/react";
 import { useState } from "react";
+import { cn } from "~/lib/utils";
 
 interface FavoriteButtonProps {
   projectId: number;
   className?: string;
+  fullWidth?: boolean;
+  label?: string;
 }
 
-export default function FavoriteButton({ projectId, className = "" }: FavoriteButtonProps) {
+export default function FavoriteButton({
+  projectId,
+  className = "",
+  fullWidth = false,
+  label = "Избранное",
+}: FavoriteButtonProps) {
   const [isToggling, setIsToggling] = useState(false);
   const utils = api.useUtils();
   
@@ -80,11 +88,16 @@ export default function FavoriteButton({ projectId, className = "" }: FavoriteBu
     <button
       onClick={handleToggle}
       disabled={isToggling}
-      className={`w-8 h-8 bg-background/80 backdrop-blur-sm rounded-full flex items-center justify-center hover:bg-background/90 transition-colors disabled:opacity-50 border border-border ${className}`}
+      className={cn(
+        "flex items-center justify-center border border-border bg-background/80 backdrop-blur-sm transition-colors hover:bg-background/90 disabled:opacity-50",
+        fullWidth ? "h-9 w-full gap-2 rounded-md px-3" : "h-8 w-8 rounded-full",
+        className,
+      )}
     >
       <Heart 
         className={`w-4 h-4 ${isFavorite ? 'text-gray-500 fill-gray-500' : 'text-foreground'} ${isToggling ? 'animate-pulse' : ''}`} 
       />
+      {fullWidth && <span className="text-sm">{label}</span>}
     </button>
   );
 }

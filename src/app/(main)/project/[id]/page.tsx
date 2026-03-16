@@ -559,8 +559,8 @@ export default function ProjectPage({ params }: ProjectPageProps) {
         {/* Правая колонка - Информация и кнопки (50%) */}
         <div className="w-full md:w-1/2 flex flex-col space-y-6">
           {/* Заголовок и кнопки */}
-          <div className="flex items-start justify-between gap-4">
-            <div className="flex-1">
+          <div className="w-full space-y-3">
+            <div className="w-full">
               <h1 className="text-2xl font-bold">{displayProject.title}</h1>
               {displayProject.featured && (
                 <div className="mt-1">
@@ -568,11 +568,12 @@ export default function ProjectPage({ params }: ProjectPageProps) {
                 </div>
               )}
             </div>
-            <div className="flex gap-2 flex-shrink-0">
-              <FavoriteButton projectId={displayProject.id} />
+            <div className="grid w-full grid-cols-1 gap-2 sm:grid-cols-3">
+              <FavoriteButton projectId={displayProject.id} fullWidth />
               <Button
                 variant="outline"
                 size="sm"
+                className="w-full justify-center"
                 onClick={() => {
                   void downloadProjectArchive();
                 }}
@@ -585,6 +586,7 @@ export default function ProjectPage({ params }: ProjectPageProps) {
               <Button
                 variant="outline"
                 size="sm"
+                className="w-full justify-center"
                 onClick={() => {
                   try {
                     const link = `https://t.me/matibott_bot?startapp=project_${displayProject.id}`;
