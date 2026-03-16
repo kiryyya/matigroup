@@ -285,8 +285,7 @@ export default function ProjectPage({ params }: ProjectPageProps) {
       const safeTitleBase = (displayProject.title || `project_${displayProject.id}`)
         .normalize("NFKD")
         .replace(/[^\x20-\x7E]/g, "_")
-        .replace(/[\\/:*?"<>|]/g, "_")
-        .replace(/\s+/g, "_")
+        .replace(/[^a-zA-Z0-9._-]/g, "_")
         .replace(/_+/g, "_")
         .replace(/^[_\.]+|[_\.]+$/g, "");
       const archiveFileName = `${safeTitleBase || `project_${displayProject.id}`}.zip`;

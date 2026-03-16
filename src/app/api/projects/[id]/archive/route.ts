@@ -26,7 +26,13 @@ type ProjectAttachmentLike = {
 };
 
 function sanitizeFileName(name: string): string {
-  return name.replace(/[\\/:*?"<>|]/g, "_").trim() || "file";
+  const normalized = name
+    .normalize("NFKD")
+    .replace(/[^\x20-\x7E]/g, "_")
+    .replace(/[^a-zA-Z0-9._-]/g, "_")
+    .replace(/_+/g, "_")
+    .replace(/^[_\.]+|[_\.]+$/g, "");
+  return normalized || "file";
 }
 
 function tryParseArray(value: unknown): unknown[] {
@@ -117,10 +123,17 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       }
     }
 
-    const user = await requireTelegramUser(authHeaders);
+    let user: Awaited<ReturnType<typeof requireTelegramUser>> | null = null;
+    try {
+      user = await requireTelegramUser(authHeaders);
+    } catch {
+      // Для downloadFile в Telegram часть клиентов может не пробрасывать auth-заголовки.
+      // В таком случае разрешаем скачивание только опубликованных проектов.
+      user = null;
+    }
     const project = await db.query.projects.findFirst({
       where:
-        user.role === "admin"
+        user?.role === "admin"
           ? eq(projects.id, projectId)
           : and(eq(projects.id, projectId), eq(projects.status, "published")),
       columns: {
@@ -229,21 +242,13 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     }
 
     const archiveName = sanitizeFileName(project.title || `project_${projectId}`);
-    const finalName = `${archiveName}.zip`;
-    const asciiFileName =
-      finalName
-        .normalize("NFKD")
-        .replace(/[^\x20-\x7E]/g, "_")
-        .replace(/[\\/:*?"<>|]/g, "_")
-        .replace(/\s+/g, "_")
-        .replace(/_+/g, "_")
-        .replace(/^[_\.]+|[_\.]+$/g, "") || `project_${projectId}.zip`;
+    const finalName = `${archiveName || `project_${projectId}`}.zip`;
 
     return new NextResponse(generated as BodyInit, {
       status: 200,
       headers: {
         "Content-Type": "application/zip",
-        "Content-Disposition": `attachment; filename=\"${asciiFileName}\"`,
+        "Content-Disposition": `attachment; filename="${finalName}"`,
         "Content-Length": generated.length.toString(),
         "Access-Control-Allow-Origin": "*",
         "X-Content-Type-Options": "nosniff",
