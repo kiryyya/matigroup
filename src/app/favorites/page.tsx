@@ -4,7 +4,7 @@ import { api } from "~/trpc/react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "~/components/ui/card";
 import { Badge } from "~/components/ui/badge";
 import Loader from "~/components/ui/loader";
-import { Heart, Calendar, User, MapPin } from "lucide-react";
+import { Heart, Calendar, MapPin } from "lucide-react";
 import Link from "next/link";
 import { useState, useEffect, useRef, useMemo } from "react";
 import type { StoredImage } from "~/types/files";
@@ -171,10 +171,6 @@ export default function FavoritesPage() {
                     </Badge>
                     
                     <div className="flex items-center gap-4 text-sm text-gray-600">
-                      <span className="flex items-center gap-1">
-                        <User className="h-4 w-4" />
-                        {project.user?.name || 'Автор'}
-                      </span>
                       <span className="flex items-center gap-1">
                         <Calendar className="h-4 w-4" />
                         {new Date(project.createdAt).toLocaleDateString('ru-RU')}
