@@ -60,6 +60,9 @@ ADD COLUMN IF NOT EXISTS "filters" json DEFAULT '[]'::json;
 ALTER TABLE "projects"
 ADD COLUMN IF NOT EXISTS "filter_values" json DEFAULT '{}'::json;
 
+ALTER TABLE "projects"
+ADD COLUMN IF NOT EXISTS "project_year" integer;
+
 UPDATE "categories"
 SET "filters" = '[]'::json
 WHERE "filters" IS NULL;
