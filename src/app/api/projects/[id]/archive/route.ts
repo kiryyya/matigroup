@@ -231,12 +231,14 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     const archiveName = sanitizeFileName(project.title || `project_${projectId}`);
     const finalName = `${archiveName}.zip`;
 
+    const safeFileName = finalName.replace(/[\\/:*?"<>|]/g, "_");
     return new NextResponse(generated as BodyInit, {
       status: 200,
       headers: {
         "Content-Type": "application/zip",
-        "Content-Disposition": `attachment; filename*=UTF-8''${encodeURIComponent(finalName)}`,
+        "Content-Disposition": `attachment; filename="${safeFileName}"; filename*=UTF-8''${encodeURIComponent(finalName)}`,
         "Content-Length": generated.length.toString(),
+        "Access-Control-Allow-Origin": "*",
       },
     });
   } catch (error) {

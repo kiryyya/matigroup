@@ -289,6 +289,28 @@ export default function ProjectPage({ params }: ProjectPageProps) {
       const archiveUrl = `/api/projects/${displayProject.id}/archive${
         initData ? `?initData=${encodeURIComponent(initData)}` : ""
       }`;
+      const absoluteArchiveUrl =
+        archiveUrl.startsWith("http") ? archiveUrl : `${window.location.origin}${archiveUrl}`;
+
+      // 1) В Telegram Mini App (Bot API 8.0+): нативный диалог «Куда сохранить» без открытия браузера.
+      const tgWebApp = window.Telegram?.WebApp as
+        | (typeof window.Telegram.WebApp & {
+            downloadFile?: (params: { url: string; file_name: string }, callback?: (accepted: boolean) => void) => void;
+          })
+        | undefined;
+      if (typeof tgWebApp?.downloadFile === "function") {
+        try {
+          tgWebApp.downloadFile(
+            { url: absoluteArchiveUrl, file_name: archiveFileName },
+            (accepted) => {
+              if (accepted) toast.success("Скачивание архива запущено");
+            },
+          );
+          return;
+        } catch (e) {
+          console.warn("Telegram downloadFile failed, fallback:", e);
+        }
+      }
 
       const windowWithSavePicker = window as Window & {
         showSaveFilePicker?: (options: unknown) => Promise<{
@@ -299,6 +321,7 @@ export default function ProjectPage({ params }: ProjectPageProps) {
         }>;
       };
 
+      // 2) Desktop: File System Access API — выбор папки/имени файла.
       if (typeof windowWithSavePicker.showSaveFilePicker === "function") {
         try {
           const response = await fetch(`/api/projects/${displayProject.id}/archive`, {
@@ -341,17 +364,12 @@ export default function ProjectPage({ params }: ProjectPageProps) {
             pickerError && typeof pickerError === "object" && "name" in pickerError
               ? String((pickerError as { name?: string }).name)
               : "";
-          // Пользователь отменил диалог выбора файла.
-          if (errorName === "AbortError") {
-            return;
-          }
+          if (errorName === "AbortError") return;
           console.warn("showSaveFilePicker недоступен или завершился ошибкой, fallback:", pickerError);
         }
       }
 
-      // Fallback: ссылка с download — в WebView часто открывается системное окно сохранения.
-      const absoluteArchiveUrl =
-        archiveUrl.startsWith("http") ? archiveUrl : `${window.location.origin}${archiveUrl}`;
+      // 3) Fallback: программный клик по ссылке с download — в части окружений откроется «Сохранить».
       const a = document.createElement("a");
       a.href = absoluteArchiveUrl;
       a.download = archiveFileName;
