@@ -226,103 +226,101 @@ export default function CreateProjectModal({ isOpen, onClose }: CreateProjectMod
   };
 
   const addImage = () => {
-    if (images.length < 10) {
-      const input = document.createElement('input');
-      input.type = 'file';
-      input.accept = 'image/*';
-      input.multiple = true;
-      input.onchange = (e) => {
-        const files = (e.target as HTMLInputElement).files;
-        if (files) {
-          const fileArray = Array.from(files);
-          
-        const processFiles = async () => {
-          setIsProcessingImages(true);
-          startUpload();
-          
-          const errors: Array<{ fileName: string; error: string }> = [];
-          let successCount = 0;
-          
-          try {
-            for (const file of fileArray) {
-              try {
-                if (file.size > 5 * 1024 * 1024) {
-                  errors.push({ fileName: file.name, error: "Файл слишком большой. Максимальный размер: 5MB" });
-                  continue;
-                }
-                
-                const { width, height } = await getImageDimensions(file);
-                const previewBlob = await createImagePreview(file, {
-                  maxWidth: 600,
-                  maxHeight: 600,
-                  quality: 0.7,
-                });
-
-                // Используем глобальный File-конструктор через any,
-                // чтобы избежать проблем типизации при сборке
-                const PreviewFileCtor =
-                  (globalThis as any).File ?? (window as any).File;
-                const previewFile: File = new PreviewFileCtor(
-                  [previewBlob],
-                  `preview-${file.name}`,
-                  { type: "image/jpeg" },
-                );
-
-                // Проверяем размер preview файла
-                if (previewFile.size > 5 * 1024 * 1024) {
-                  errors.push({ fileName: file.name, error: "Preview файл слишком большой после обработки" });
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/*';
+    input.multiple = true;
+    input.onchange = (e) => {
+      const files = (e.target as HTMLInputElement).files;
+      if (files) {
+        const fileArray = Array.from(files);
+        
+      const processFiles = async () => {
+        setIsProcessingImages(true);
+        startUpload();
+        
+        const errors: Array<{ fileName: string; error: string }> = [];
+        let successCount = 0;
+        
+        try {
+          for (const file of fileArray) {
+            try {
+              if (file.size > 5 * 1024 * 1024) {
+                errors.push({ fileName: file.name, error: "Файл слишком большой. Максимальный размер: 5MB" });
                 continue;
               }
               
-                const [originalUpload, previewUpload] = await Promise.all([
-                  uploadFile({ file, kind: "image", variant: "original" }),
-                  uploadFile({ file: previewFile, kind: "image", variant: "preview" }),
-                ]);
+              const { width, height } = await getImageDimensions(file);
+              const previewBlob = await createImagePreview(file, {
+                maxWidth: 600,
+                maxHeight: 600,
+                quality: 0.7,
+              });
 
-                setImages((prev) => [
-                  ...prev,
-                  {
-                    key: originalUpload.key,
-                    url: originalUpload.url,
-                    previewUrl: previewUpload.url,
-                    size: originalUpload.size,
-                    mimeType: originalUpload.mimeType,
-                    width,
-                    height,
-                    originalName: originalUpload.originalName,
-                  },
-                ]);
-                
-                successCount++;
-              } catch (error) {
-                const errorMessage = error instanceof Error ? error.message : "Неизвестная ошибка";
-                errors.push({ fileName: file.name, error: errorMessage });
-                console.error(`Ошибка загрузки изображения ${file.name}:`, error);
-              }
+              // Используем глобальный File-конструктор через any,
+              // чтобы избежать проблем типизации при сборке
+              const PreviewFileCtor =
+                (globalThis as any).File ?? (window as any).File;
+              const previewFile: File = new PreviewFileCtor(
+                [previewBlob],
+                `preview-${file.name}`,
+                { type: "image/jpeg" },
+              );
+
+              // Проверяем размер preview файла
+              if (previewFile.size > 5 * 1024 * 1024) {
+                errors.push({ fileName: file.name, error: "Preview файл слишком большой после обработки" });
+              continue;
             }
             
-            // Показываем результаты
-            if (errors.length > 0) {
-              const errorDetails = errors.map(e => `• ${e.fileName}: ${e.error}`).join('\n');
-              alert(`Не удалось загрузить ${errors.length} из ${fileArray.length} файлов:\n\n${errorDetails}`);
-            } else if (successCount > 0) {
-              // Все успешно загружены
-              console.log(`Успешно загружено ${successCount} изображений`);
-                  }
-          } catch (error) {
-            console.error("Критическая ошибка при обработке файлов:", error);
-            alert("Произошла критическая ошибка при загрузке изображений");
-          } finally {
-            setIsProcessingImages(false);
-            endUpload();
+              const [originalUpload, previewUpload] = await Promise.all([
+                uploadFile({ file, kind: "image", variant: "original" }),
+                uploadFile({ file: previewFile, kind: "image", variant: "preview" }),
+              ]);
+
+              setImages((prev) => [
+                ...prev,
+                {
+                  key: originalUpload.key,
+                  url: originalUpload.url,
+                  previewUrl: previewUpload.url,
+                  size: originalUpload.size,
+                  mimeType: originalUpload.mimeType,
+                  width,
+                  height,
+                  originalName: originalUpload.originalName,
+                },
+              ]);
+              
+              successCount++;
+            } catch (error) {
+              const errorMessage = error instanceof Error ? error.message : "Неизвестная ошибка";
+              errors.push({ fileName: file.name, error: errorMessage });
+              console.error(`Ошибка загрузки изображения ${file.name}:`, error);
+            }
           }
-        };
-        
-        void processFiles();
+          
+          // Показываем результаты
+          if (errors.length > 0) {
+            const errorDetails = errors.map(e => `• ${e.fileName}: ${e.error}`).join('\n');
+            alert(`Не удалось загрузить ${errors.length} из ${fileArray.length} файлов:\n\n${errorDetails}`);
+          } else if (successCount > 0) {
+            // Все успешно загружены
+            console.log(`Успешно загружено ${successCount} изображений`);
+                }
+        } catch (error) {
+          console.error("Критическая ошибка при обработке файлов:", error);
+          alert("Произошла критическая ошибка при загрузке изображений");
+        } finally {
+          setIsProcessingImages(false);
+          endUpload();
         }
       };
-      input.click();
-    }
+      
+      void processFiles();
+      }
+    };
+    input.click();
   };
 
   const removeImage = (index: number) => {
@@ -459,9 +457,12 @@ export default function CreateProjectModal({ isOpen, onClose }: CreateProjectMod
             <Textarea
               id="description"
               {...register("description")}
-              placeholder="Краткое описание проекта"
+              placeholder="Краткое описание проекта (можно Markdown)"
               rows={3}
             />
+            <p className="text-xs text-muted-foreground">
+              Опционально: поддерживается Markdown (заголовки, списки, таблицы и т.д.).
+            </p>
           </div>
 
           {/* Подробное описание */}
@@ -560,7 +561,7 @@ export default function CreateProjectModal({ isOpen, onClose }: CreateProjectMod
 
           {/* Изображения */}
           <div className="space-y-2">
-            <Label>Изображения (до 10)</Label>
+            <Label>Изображения</Label>
             <div className="space-y-2">
               {images.map((image, index) => (
                 <div
@@ -630,27 +631,25 @@ export default function CreateProjectModal({ isOpen, onClose }: CreateProjectMod
                   </div>
                 </div>
               ))}
-              {images.length < 10 && (
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={addImage}
-                  disabled={isProcessingImages || isUploadingFiles}
-                  className="w-full"
-                >
-                  {isProcessingImages ? (
-                    <>
-                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-current mr-2" />
-                      Обработка...
-                    </>
-                  ) : (
-                    <>
-                      <Plus className="h-4 w-4 mr-2" />
-                      Выбрать изображения
-                    </>
-                  )}
-                </Button>
-              )}
+              <Button
+                type="button"
+                variant="outline"
+                onClick={addImage}
+                disabled={isProcessingImages || isUploadingFiles}
+                className="w-full"
+              >
+                {isProcessingImages ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-current mr-2" />
+                    Обработка...
+                  </>
+                ) : (
+                  <>
+                    <Plus className="h-4 w-4 mr-2" />
+                    Выбрать изображения
+                  </>
+                )}
+              </Button>
               {images.length > 1 && (
                 <p className="text-xs text-muted-foreground">
                   Подсказка: перетаскивайте изображения мышкой или используйте стрелки для смены порядка.

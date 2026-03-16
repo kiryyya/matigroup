@@ -403,6 +403,9 @@ export default function EditProjectModal({ isOpen, onClose, project }: EditProje
             <div className="space-y-2">
               <Label htmlFor="description">Краткое описание</Label>
               <Textarea id="description" {...register("description")} rows={3} />
+              <p className="text-xs text-muted-foreground">
+                Опционально: поддерживается Markdown (заголовки, списки, таблицы и т.д.).
+              </p>
             </div>
 
             <div className="space-y-2">

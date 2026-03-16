@@ -14,6 +14,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "~/components/u
 import EditProjectModal from "~/components/edit-project-modal";
 import { toast } from "sonner";
 import { useModal } from "~/contexts/modal-context";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import type { StoredAttachment, StoredImage } from "~/types/files";
 
 interface ProjectPageProps {
@@ -611,7 +613,11 @@ export default function ProjectPage({ params }: ProjectPageProps) {
             </CardHeader>
             <CardContent className="space-y-4 flex-1">
               {displayProject.description && (
-                <p className="text-muted-foreground">{displayProject.description}</p>
+                <div className="prose prose-sm max-w-none text-muted-foreground dark:prose-invert">
+                  <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                    {displayProject.description}
+                  </ReactMarkdown>
+                </div>
               )}
               
               {displayProject.content && (
