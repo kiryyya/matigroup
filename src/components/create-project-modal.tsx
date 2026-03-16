@@ -542,7 +542,7 @@ export default function CreateProjectModal({ isOpen, onClose }: CreateProjectMod
                 <div
                   key={`${image.key}-${index}`}
                   className={cn(
-                    "flex items-center gap-2 rounded-md border p-2",
+                    "flex min-w-0 flex-wrap items-center gap-2 rounded-md border p-2",
                     draggedImageIndex === index ? "opacity-60" : "",
                   )}
                   draggable
@@ -566,37 +566,44 @@ export default function CreateProjectModal({ isOpen, onClose }: CreateProjectMod
                       }
                     }}
                   />
-                  <span className="flex-1 text-sm truncate">
-                    {image.originalName || `Изображение ${index + 1}`}
-                  </span>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => moveImage(index, index - 1)}
-                    disabled={index === 0}
-                    title="Переместить выше"
-                  >
-                    <ArrowUp className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => moveImage(index, index + 1)}
-                    disabled={index === images.length - 1}
-                    title="Переместить ниже"
-                  >
-                    <ArrowDown className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => removeImage(index)}
-                  >
-                    <X className="h-4 w-4" />
-                  </Button>
+                  <div className="min-w-0 flex-1">
+                    <span className="block truncate text-sm">
+                      {image.originalName || `Изображение ${index + 1}`}
+                    </span>
+                    {index === 0 && (
+                      <span className="text-xs font-medium text-primary">Обложка проекта</span>
+                    )}
+                  </div>
+                  <div className="ml-auto flex w-full justify-end gap-1 sm:w-auto">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => moveImage(index, index - 1)}
+                      disabled={index === 0}
+                      title="Переместить выше"
+                    >
+                      <ArrowUp className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => moveImage(index, index + 1)}
+                      disabled={index === images.length - 1}
+                      title="Переместить ниже"
+                    >
+                      <ArrowDown className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => removeImage(index)}
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </div>
                 </div>
               ))}
               {images.length < 10 && (
