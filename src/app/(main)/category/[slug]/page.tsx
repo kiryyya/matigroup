@@ -337,7 +337,7 @@ export default function CategoryPage({ params }: CategoryPageProps) {
                       
                       {/* Нижний градиент с названием */}
                       <div className="absolute inset-x-0 bottom-0 z-10 p-4 pt-10 bg-gradient-to-t from-black/80 to-transparent">
-                        <CardTitle className="text-white line-clamp-2">{project.title}</CardTitle>
+                        <CardTitle className="line-clamp-2 text-lg text-white">{project.title}</CardTitle>
                       </div>
 
                       {/* Кнопка избранного справа сверху */}
@@ -352,7 +352,7 @@ export default function CategoryPage({ params }: CategoryPageProps) {
                       {/* Плейсхолдер без изображения */}
                       <div className="absolute inset-0 bg-muted" />
                       <div className="absolute inset-x-0 bottom-0 z-10 p-4 pt-10 bg-gradient-to-t from-black/80 to-transparent">
-                        <CardTitle className="text-white line-clamp-2">{project.title}</CardTitle>
+                        <CardTitle className="line-clamp-2 text-lg text-white">{project.title}</CardTitle>
                       </div>
                     </>
                   )}

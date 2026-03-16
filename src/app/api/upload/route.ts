@@ -11,8 +11,8 @@ import { checkRateLimit, getClientIp } from "~/lib/rate-limit";
 // Force dynamic rendering - don't execute during build
 export const dynamic = 'force-dynamic';
 
-const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
-const MAX_ATTACHMENT_BYTES = 25 * 1024 * 1024;
+const MAX_IMAGE_BYTES = 50 * 1024 * 1024;
+const MAX_ATTACHMENT_BYTES = 50 * 1024 * 1024;
 
 type WatermarkConfig = {
   enabled?: boolean;

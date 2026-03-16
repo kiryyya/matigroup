@@ -245,8 +245,8 @@ export default function CreateProjectModal({ isOpen, onClose }: CreateProjectMod
         try {
           for (const file of fileArray) {
             try {
-              if (file.size > 5 * 1024 * 1024) {
-                errors.push({ fileName: file.name, error: "Файл слишком большой. Максимальный размер: 5MB" });
+              if (file.size > 50 * 1024 * 1024) {
+                errors.push({ fileName: file.name, error: "Файл слишком большой. Максимальный размер: 50MB" });
                 continue;
               }
               
@@ -268,7 +268,7 @@ export default function CreateProjectModal({ isOpen, onClose }: CreateProjectMod
               );
 
               // Проверяем размер preview файла
-              if (previewFile.size > 5 * 1024 * 1024) {
+              if (previewFile.size > 50 * 1024 * 1024) {
                 errors.push({ fileName: file.name, error: "Preview файл слишком большой после обработки" });
               continue;
             }
@@ -370,8 +370,8 @@ export default function CreateProjectModal({ isOpen, onClose }: CreateProjectMod
           startUpload();
           try {
             for (const file of fileArray) {
-              if (file.size > 25 * 1024 * 1024) {
-                alert(`Файл ${file.name} слишком большой. Максимальный размер: 25MB`);
+              if (file.size > 50 * 1024 * 1024) {
+                alert(`Файл ${file.name} слишком большой. Максимальный размер: 50MB`);
                 continue;
               }
               const uploaded = await uploadFile({ file, kind: "attachment" });
