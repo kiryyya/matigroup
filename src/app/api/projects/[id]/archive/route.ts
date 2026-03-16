@@ -230,15 +230,23 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
 
     const archiveName = sanitizeFileName(project.title || `project_${projectId}`);
     const finalName = `${archiveName}.zip`;
+    const asciiFileName =
+      finalName
+        .normalize("NFKD")
+        .replace(/[^\x20-\x7E]/g, "_")
+        .replace(/[\\/:*?"<>|]/g, "_")
+        .replace(/\s+/g, "_")
+        .replace(/_+/g, "_")
+        .replace(/^[_\.]+|[_\.]+$/g, "") || `project_${projectId}.zip`;
 
-    const safeFileName = finalName.replace(/[\\/:*?"<>|]/g, "_");
     return new NextResponse(generated as BodyInit, {
       status: 200,
       headers: {
         "Content-Type": "application/zip",
-        "Content-Disposition": `attachment; filename="${safeFileName}"; filename*=UTF-8''${encodeURIComponent(finalName)}`,
+        "Content-Disposition": `attachment; filename=\"${asciiFileName}\"`,
         "Content-Length": generated.length.toString(),
         "Access-Control-Allow-Origin": "*",
+        "X-Content-Type-Options": "nosniff",
       },
     });
   } catch (error) {

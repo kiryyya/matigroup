@@ -282,10 +282,14 @@ export default function ProjectPage({ params }: ProjectPageProps) {
     try {
       setIsArchiveDownloading(true);
       const initData = window.Telegram?.WebApp?.initData ?? "";
-      const safeTitle = (displayProject.title || `project_${displayProject.id}`)
+      const safeTitleBase = (displayProject.title || `project_${displayProject.id}`)
+        .normalize("NFKD")
+        .replace(/[^\x20-\x7E]/g, "_")
         .replace(/[\\/:*?"<>|]/g, "_")
-        .trim();
-      const archiveFileName = `${safeTitle || `project_${displayProject.id}`}.zip`;
+        .replace(/\s+/g, "_")
+        .replace(/_+/g, "_")
+        .replace(/^[_\.]+|[_\.]+$/g, "");
+      const archiveFileName = `${safeTitleBase || `project_${displayProject.id}`}.zip`;
       const archiveUrl = `/api/projects/${displayProject.id}/archive${
         initData ? `?initData=${encodeURIComponent(initData)}` : ""
       }`;
