@@ -277,7 +277,7 @@ export default function ProjectPage({ params }: ProjectPageProps) {
     }
   };
 
-  const downloadProjectArchive = async () => {
+  const downloadProjectArchive = async (withoutWatermark = false) => {
     if (!displayProject) return;
     try {
       setIsArchiveDownloading(true);
@@ -292,8 +292,8 @@ export default function ProjectPage({ params }: ProjectPageProps) {
       const cacheBust = Date.now();
       const archiveUrl = `/api/projects/${displayProject.id}/archive${
         initData
-          ? `?initData=${encodeURIComponent(initData)}&dl=${cacheBust}`
-          : `?dl=${cacheBust}`
+          ? `?initData=${encodeURIComponent(initData)}&dl=${cacheBust}&watermark=${withoutWatermark ? "false" : "true"}`
+          : `?dl=${cacheBust}&watermark=${withoutWatermark ? "false" : "true"}`
       }`;
       const absoluteArchiveUrl =
         archiveUrl.startsWith("http") ? archiveUrl : `${window.location.origin}${archiveUrl}`;
@@ -330,7 +330,7 @@ export default function ProjectPage({ params }: ProjectPageProps) {
       // 2) Desktop: File System Access API — выбор папки/имени файла.
       if (typeof windowWithSavePicker.showSaveFilePicker === "function") {
         try {
-          const response = await fetch(`/api/projects/${displayProject.id}/archive`, {
+          const response = await fetch(archiveUrl, {
             headers: {
               "x-telegram-init-data": initData,
             },
@@ -594,7 +594,9 @@ export default function ProjectPage({ params }: ProjectPageProps) {
                 </div>
               )}
             </div>
-            <div className="grid w-full grid-cols-1 gap-2 sm:grid-cols-3">
+            <div
+              className={`grid w-full grid-cols-1 gap-2 ${user?.role === "admin" ? "sm:grid-cols-4" : "sm:grid-cols-3"}`}
+            >
               <FavoriteButton projectId={displayProject.id} fullWidth />
               <Button
                 variant="outline"
@@ -609,6 +611,21 @@ export default function ProjectPage({ params }: ProjectPageProps) {
                 <Archive className="h-4 w-4 mr-2" />
                 {isArchiveDownloading ? "Скачивание..." : "Скачать архив"}
               </Button>
+              {user?.role === "admin" && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="w-full justify-center"
+                  onClick={() => {
+                    void downloadProjectArchive(true);
+                  }}
+                  disabled={isArchiveDownloading}
+                  title="Скачать архив без водяного знака"
+                >
+                  <Archive className="h-4 w-4 mr-2" />
+                  {isArchiveDownloading ? "Скачивание..." : "Без водяного знака"}
+                </Button>
+              )}
               <Button
                 variant="outline"
                 size="sm"
