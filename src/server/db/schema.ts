@@ -74,6 +74,7 @@ export const projects = createTable("projects", {
   images: json("images").$type<StoredImage[]>().default([]),
   attachments: json("attachments").$type<StoredAttachment[]>().default([]),
   filterValues: json("filter_values").$type<ProjectFilterValues>().default({}),
+  projectYear: integer("project_year"),
   categoryId: integer("category_id")
     .notNull()
     .references(() => categories.id, { onDelete: "cascade" }),

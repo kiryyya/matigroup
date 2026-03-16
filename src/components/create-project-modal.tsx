@@ -23,10 +23,31 @@ import {
 } from "~/lib/upload";
 import type { ProjectFilterValues } from "~/types/category-filters";
 
+const CustomDialogContent = React.forwardRef<
+  React.ElementRef<typeof DialogPrimitive.Content>,
+  React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content>
+>(({ className, children, ...props }, ref) => (
+  <DialogPortal>
+    <DialogOverlay />
+    <DialogPrimitive.Content
+      ref={ref}
+      className={cn(
+        "fixed left-[50%] top-[50%] z-50 grid w-full max-w-lg translate-x-[-50%] translate-y-[-50%] gap-4 border bg-background p-6 shadow-lg duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%] data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%] sm:rounded-lg",
+        className
+      )}
+      {...props}
+    >
+      {children}
+    </DialogPrimitive.Content>
+  </DialogPortal>
+));
+CustomDialogContent.displayName = "CustomDialogContent";
+
 const projectSchema = z.object({
   title: z.string().min(1, "Название обязательно"),
   description: z.string().optional(),
   content: z.string().optional(),
+  projectYear: z.number().int().min(1000).max(9999).optional(),
   categoryId: z.number().min(1, "Выберите категорию"),
   links: z.array(z.string().url("Неверный URL")).optional(),
   pdfFiles: z.array(z.string()).optional(),
@@ -160,6 +181,7 @@ export default function CreateProjectModal({ isOpen, onClose }: CreateProjectMod
         title: data.title,
         description: data.description ? data.description : undefined,
         content: data.content ? data.content : undefined,
+        projectYear: data.projectYear,
         categoryId: data.categoryId,
         images: images.length > 0 ? images : undefined,
         attachments: attachments.length > 0 ? attachments : undefined,
@@ -407,27 +429,6 @@ export default function CreateProjectModal({ isOpen, onClose }: CreateProjectMod
     return <File className="h-4 w-4" />;
   };
 
-  // Кастомный DialogContent без крестика
-  const CustomDialogContent = React.forwardRef<
-    React.ElementRef<typeof DialogPrimitive.Content>,
-    React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content>
-  >(({ className, children, ...props }, ref) => (
-    <DialogPortal>
-      <DialogOverlay />
-      <DialogPrimitive.Content
-        ref={ref}
-        className={cn(
-          "fixed left-[50%] top-[50%] z-50 grid w-full max-w-lg translate-x-[-50%] translate-y-[-50%] gap-4 border bg-background p-6 shadow-lg duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%] data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%] sm:rounded-lg",
-          className
-        )}
-        {...props}
-      >
-        {children}
-      </DialogPrimitive.Content>
-    </DialogPortal>
-  ));
-  CustomDialogContent.displayName = "CustomDialogContent";
-
   return (
     <Dialog open={isOpen}>
       <CustomDialogContent
@@ -472,6 +473,29 @@ export default function CreateProjectModal({ isOpen, onClose }: CreateProjectMod
               placeholder="Подробное описание проекта (HTML поддерживается)"
               rows={5}
             />
+          </div>
+
+          {/* Категория */}
+          <div className="space-y-2">
+            <Label htmlFor="projectYear">Год</Label>
+            <Input
+              id="projectYear"
+              type="number"
+              inputMode="numeric"
+              min={1000}
+              max={9999}
+              placeholder="Например, 2024"
+              {...register("projectYear", {
+                setValueAs: (value) => {
+                  if (value === "" || value === null || value === undefined) return undefined;
+                  const parsed = Number(value);
+                  return Number.isFinite(parsed) ? parsed : undefined;
+                },
+              })}
+            />
+            <p className="text-xs text-muted-foreground">
+              Укажите только год. Эта дата будет показываться в проекте.
+            </p>
           </div>
 
           {/* Категория */}

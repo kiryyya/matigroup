@@ -173,7 +173,7 @@ export default function FavoritesPage() {
                     <div className="flex items-center gap-4 text-sm text-gray-600">
                       <span className="flex items-center gap-1">
                         <Calendar className="h-4 w-4" />
-                        {new Date(project.createdAt).toLocaleDateString('ru-RU')}
+                        {project.projectYear ? String(project.projectYear) : "Год не указан"}
                       </span>
                     </div>
                   </div>

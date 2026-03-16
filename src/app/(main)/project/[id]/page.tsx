@@ -7,7 +7,7 @@ import { Button } from "~/components/ui/button";
 import Loader from "~/components/ui/loader";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Calendar, User, Download, Eye, FileText, Image as ImageIcon, FileVideo, FileAudio, Archive, File, Trash2, X, Pencil, Copy, ChevronLeft, ChevronRight, Maximize2 } from "lucide-react";
+import { ArrowLeft, Calendar, Download, Eye, FileText, Image as ImageIcon, FileVideo, FileAudio, Archive, File, Trash2, X, Pencil, Copy, ChevronLeft, ChevronRight, Maximize2 } from "lucide-react";
 import FavoriteButton from "~/components/favorite-button";
 import { useState, useEffect, useLayoutEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "~/components/ui/dialog";
@@ -706,7 +706,7 @@ export default function ProjectPage({ params }: ProjectPageProps) {
                 </Button>
                 <div className="ml-auto flex items-center gap-2 text-sm text-muted-foreground">
                   <Calendar className="h-4 w-4" />
-                  <span>{new Date(displayProject.createdAt).toLocaleDateString()}</span>
+                  <span>{displayProject.projectYear ? String(displayProject.projectYear) : "Год не указан"}</span>
                 </div>
               </div>
             )}

@@ -21,11 +21,32 @@ import {
 } from "~/lib/upload";
 import type { ProjectFilterValues } from "~/types/category-filters";
 
+const CustomDialogContent = React.forwardRef<
+  React.ElementRef<typeof DialogPrimitive.Content>,
+  React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content>
+>(({ className, children, ...props }, ref) => (
+  <DialogPortal>
+    <DialogOverlay />
+    <DialogPrimitive.Content
+      ref={ref}
+      className={cn(
+        "fixed left-[50%] top-[50%] z-50 grid w-full max-w-lg translate-x-[-50%] translate-y-[-50%] gap-4 border bg-background p-6 shadow-lg duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%] data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%] sm:rounded-lg",
+        className
+      )}
+      {...props}
+    >
+      {children}
+    </DialogPrimitive.Content>
+  </DialogPortal>
+));
+CustomDialogContent.displayName = "CustomDialogContent";
+
 type EditableProject = {
   id: number;
   title: string;
   description?: string | null;
   content?: string | null;
+  projectYear?: number | null;
   categoryId: number;
   images?: StoredImage[] | null;
   attachments?: StoredAttachment[] | null;
@@ -78,7 +99,7 @@ export default function EditProjectModal({ isOpen, onClose, project }: EditProje
   const startUpload = () => setUploadCount((count) => count + 1);
   const endUpload = () => setUploadCount((count) => Math.max(0, count - 1));
 
-  const { register, handleSubmit, reset, watch } = useForm<{ title: string; description?: string; content?: string; categoryId: number }>();
+  const { register, handleSubmit, reset, watch } = useForm<{ title: string; description?: string; content?: string; projectYear?: number; categoryId: number }>();
   const categoryField = register("categoryId", { valueAsNumber: true });
   const selectedCategoryId = watch("categoryId");
   const selectedCategory = categories?.find((category) => category.id === selectedCategoryId);
@@ -105,6 +126,7 @@ export default function EditProjectModal({ isOpen, onClose, project }: EditProje
         title: project.title,
         description: project.description ?? undefined,
         content: project.content ?? undefined,
+        projectYear: project.projectYear ?? undefined,
         categoryId: project.categoryId,
       });
       setImages(project.images ?? []);
@@ -148,7 +170,7 @@ export default function EditProjectModal({ isOpen, onClose, project }: EditProje
     });
   };
 
-  const onSubmit = async (data: { title: string; description?: string; content?: string; categoryId: number }) => {
+  const onSubmit = async (data: { title: string; description?: string; content?: string; projectYear?: number; categoryId: number }) => {
     if (!project) return;
     const hasRequiredFilters = categoryFilters.some((filter) => filter.required);
     const hasSelectedFilter = Object.keys(projectFilterValues).length > 0;
@@ -166,6 +188,7 @@ export default function EditProjectModal({ isOpen, onClose, project }: EditProje
         title: data.title,
         description: data.description,
         content: data.content,
+        projectYear: data.projectYear,
         categoryId: data.categoryId,
         images: images,
         attachments: attachments,
@@ -357,26 +380,6 @@ export default function EditProjectModal({ isOpen, onClose, project }: EditProje
     return <File className="h-4 w-4" />;
   };
 
-  const CustomDialogContent = React.forwardRef<
-    React.ElementRef<typeof DialogPrimitive.Content>,
-    React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content>
-  >(({ className, children, ...props }, ref) => (
-    <DialogPortal>
-      <DialogOverlay />
-      <DialogPrimitive.Content
-        ref={ref}
-        className={cn(
-          "fixed left-[50%] top-[50%] z-50 grid w-full max-w-lg translate-x-[-50%] translate-y-[-50%] gap-4 border bg-background p-6 shadow-lg duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%] data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%] sm:rounded-lg",
-          className
-        )}
-        {...props}
-      >
-        {children}
-      </DialogPrimitive.Content>
-    </DialogPortal>
-  ));
-  CustomDialogContent.displayName = "CustomDialogContent";
-
   return (
     <Dialog open={isOpen}>
       <CustomDialogContent
@@ -408,6 +411,28 @@ export default function EditProjectModal({ isOpen, onClose, project }: EditProje
             </div>
 
             <div className="space-y-2">
+              <Label htmlFor="projectYear">Год</Label>
+              <Input
+                id="projectYear"
+                type="number"
+                inputMode="numeric"
+                min={1000}
+                max={9999}
+                placeholder="Например, 2024"
+                {...register("projectYear", {
+                  setValueAs: (value) => {
+                    if (value === "" || value === null || value === undefined) return undefined;
+                    const parsed = Number(value);
+                    return Number.isFinite(parsed) ? parsed : undefined;
+                  },
+                })}
+              />
+              <p className="text-xs text-muted-foreground">
+                Укажите только год. Эта дата будет показываться в проекте.
+              </p>
+            </div>
+
+            <div className="space-y-2">
               <Label htmlFor="category">Категория *</Label>
               <select
                 id="category"
@@ -416,7 +441,7 @@ export default function EditProjectModal({ isOpen, onClose, project }: EditProje
                 onBlur={categoryField.onBlur}
                 onChange={(e) =>
                   preserveScrollPosition(() => {
-                    categoryField.onChange(e);
+                    void categoryField.onChange(e);
                   })
                 }
                 className="w-full p-2 border border-input rounded-md bg-background"
@@ -499,7 +524,7 @@ export default function EditProjectModal({ isOpen, onClose, project }: EditProje
                     />
                     <div className="min-w-0 flex-1">
                       <span className="block truncate text-sm">
-                        {image.originalName || `Изображение ${index + 1}`}
+                        {image.originalName ?? `Изображение ${index + 1}`}
                       </span>
                       {index === 0 && (
                         <span className="text-xs font-medium text-primary">Обложка проекта</span>

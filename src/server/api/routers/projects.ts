@@ -414,6 +414,7 @@ export const projectsRouter = createTRPCRouter({
         categoryId: z.number(),
         status: z.enum(["draft", "published", "archived"]).default("draft"),
         featured: z.boolean().default(false),
+        projectYear: z.number().int().min(1000).max(9999).optional(),
         filterValues: filterValuesSchema,
       }),
     )
@@ -508,6 +509,7 @@ export const projectsRouter = createTRPCRouter({
         categoryId: z.number().optional(),
         status: z.enum(["draft", "published", "archived"]).optional(),
         featured: z.boolean().optional(),
+        projectYear: z.number().int().min(1000).max(9999).optional(),
         filterValues: filterValuesSchema,
       }),
     )
