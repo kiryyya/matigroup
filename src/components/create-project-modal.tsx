@@ -9,8 +9,7 @@ import { Textarea } from "~/components/ui/textarea";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import React, { useState } from "react";
-import { Plus, X, Upload, FileText, Link as LinkIcon, File, Image as ImageIcon, FileVideo, FileAudio, Archive } from "lucide-react";
-import Image from "next/image";
+import { Plus, X, Upload, FileText, Link as LinkIcon, File, Image as ImageIcon, FileVideo, FileAudio, Archive, ArrowUp, ArrowDown } from "lucide-react";
 import { Dialog, DialogDescription, DialogHeader, DialogTitle, DialogPortal, DialogOverlay } from "~/components/ui/dialog";
 import Loader from "~/components/ui/loader";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
@@ -68,6 +67,7 @@ export default function CreateProjectModal({ isOpen, onClose }: CreateProjectMod
   const [isProcessingImages, setIsProcessingImages] = useState(false);
   const [uploadCount, setUploadCount] = useState(0);
   const [projectFilterValues, setProjectFilterValues] = useState<ProjectFilterValues>({});
+  const [draggedImageIndex, setDraggedImageIndex] = useState<number | null>(null);
   const contentRef = React.useRef<HTMLDivElement | null>(null);
 
   const isUploadingFiles = uploadCount > 0;
@@ -307,6 +307,25 @@ export default function CreateProjectModal({ isOpen, onClose }: CreateProjectMod
     setImages(images.filter((_, i) => i !== index));
   };
 
+  const moveImage = (fromIndex: number, toIndex: number) => {
+    setImages((prev) => {
+      if (
+        fromIndex === toIndex ||
+        fromIndex < 0 ||
+        toIndex < 0 ||
+        fromIndex >= prev.length ||
+        toIndex >= prev.length
+      ) {
+        return prev;
+      }
+      const next = [...prev];
+      const [moved] = next.splice(fromIndex, 1);
+      if (!moved) return prev;
+      next.splice(toIndex, 0, moved);
+      return next;
+    });
+  };
+
   const addLink = () => {
     const url = prompt("Введите ссылку:");
     if (url) {
@@ -520,15 +539,56 @@ export default function CreateProjectModal({ isOpen, onClose }: CreateProjectMod
             <Label>Изображения (до 10)</Label>
             <div className="space-y-2">
               {images.map((image, index) => (
-                <div key={index} className="flex items-center gap-2">
-                  <Image
+                <div
+                  key={`${image.key}-${index}`}
+                  className={cn(
+                    "flex items-center gap-2 rounded-md border p-2",
+                    draggedImageIndex === index ? "opacity-60" : "",
+                  )}
+                  draggable
+                  onDragStart={() => setDraggedImageIndex(index)}
+                  onDragOver={(e) => e.preventDefault()}
+                  onDrop={() => {
+                    if (draggedImageIndex === null) return;
+                    moveImage(draggedImageIndex, index);
+                    setDraggedImageIndex(null);
+                  }}
+                  onDragEnd={() => setDraggedImageIndex(null)}
+                >
+                  <img
                     src={image.previewUrl ?? image.url}
                     alt={`Изображение ${index + 1}`}
-                    width={64}
-                    height={64}
-                    className="w-16 h-16 object-cover rounded-md"
+                    className="h-16 w-16 rounded-md object-cover"
+                    onError={(e) => {
+                      const target = e.currentTarget;
+                      if (target.src !== image.url) {
+                        target.src = image.url;
+                      }
+                    }}
                   />
-                  <span className="flex-1 text-sm truncate">Изображение {index + 1}</span>
+                  <span className="flex-1 text-sm truncate">
+                    {image.originalName || `Изображение ${index + 1}`}
+                  </span>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => moveImage(index, index - 1)}
+                    disabled={index === 0}
+                    title="Переместить выше"
+                  >
+                    <ArrowUp className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => moveImage(index, index + 1)}
+                    disabled={index === images.length - 1}
+                    title="Переместить ниже"
+                  >
+                    <ArrowDown className="h-4 w-4" />
+                  </Button>
                   <Button
                     type="button"
                     variant="outline"
@@ -559,6 +619,11 @@ export default function CreateProjectModal({ isOpen, onClose }: CreateProjectMod
                     </>
                   )}
                 </Button>
+              )}
+              {images.length > 1 && (
+                <p className="text-xs text-muted-foreground">
+                  Подсказка: перетаскивайте изображения мышкой или используйте стрелки для смены порядка.
+                </p>
               )}
             </div>
           </div>
