@@ -289,8 +289,11 @@ export default function ProjectPage({ params }: ProjectPageProps) {
         .replace(/_+/g, "_")
         .replace(/^[_\.]+|[_\.]+$/g, "");
       const archiveFileName = `${safeTitleBase || `project_${displayProject.id}`}.zip`;
+      const cacheBust = Date.now();
       const archiveUrl = `/api/projects/${displayProject.id}/archive${
-        initData ? `?initData=${encodeURIComponent(initData)}` : ""
+        initData
+          ? `?initData=${encodeURIComponent(initData)}&dl=${cacheBust}`
+          : `?dl=${cacheBust}`
       }`;
       const absoluteArchiveUrl =
         archiveUrl.startsWith("http") ? archiveUrl : `${window.location.origin}${archiveUrl}`;
