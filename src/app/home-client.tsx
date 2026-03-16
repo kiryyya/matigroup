@@ -149,12 +149,12 @@ export default function HomeClient() {
   return (
     <div className="min-h-screen flex flex-col">
       <div className="flex-1 overflow-y-auto pb-52">
-        <div className="max-w-4xl mx-auto px-4 py-6">
+        <div className="mx-auto w-full max-w-5xl px-4 py-6">
           {categories && categories.length > 0 ? (
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               {categories.map((category) => (
                 <Link key={category.id} href={`/category/${category.slug}`}>
-                  <Card className="cursor-pointer transition-all hover:shadow-lg aspect-square flex flex-col relative overflow-hidden">
+                  <Card className="relative flex aspect-video cursor-pointer flex-col overflow-hidden transition-all hover:shadow-lg">
                     <div className="absolute inset-0 z-0">
                       {category.backgroundImage ? (
                         <div
