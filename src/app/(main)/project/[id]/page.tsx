@@ -482,6 +482,8 @@ export default function ProjectPage({ params }: ProjectPageProps) {
     return [...new Set(candidates)];
   };
 
+  const looksLikeHtml = (text: string) => /<\/?[a-z][\s\S]*>/i.test(text);
+
   return (
     <>
       <div className="flex flex-col md:flex-row gap-6 min-h-[calc(100vh-12rem)] pb-52">
@@ -588,6 +590,10 @@ export default function ProjectPage({ params }: ProjectPageProps) {
           <div className="w-full space-y-3">
             <div className="w-full">
               <h1 className="text-2xl font-bold">{displayProject.title}</h1>
+              <div className="mt-1 flex items-center gap-2 text-sm text-muted-foreground">
+                <Calendar className="h-4 w-4" />
+                <span>{displayProject.projectYear ? String(displayProject.projectYear) : "Год не указан"}</span>
+              </div>
               {displayProject.featured && (
                 <div className="mt-1">
                   <Badge variant="default">⭐ Рекомендуемый</Badge>
@@ -664,8 +670,14 @@ export default function ProjectPage({ params }: ProjectPageProps) {
               )}
               
               {displayProject.content && (
-                <div className="prose max-w-none">
-                  <div dangerouslySetInnerHTML={{ __html: displayProject.content }} />
+                <div className="prose prose-sm max-w-none text-muted-foreground dark:prose-invert">
+                  {looksLikeHtml(displayProject.content) ? (
+                    <div dangerouslySetInnerHTML={{ __html: displayProject.content }} />
+                  ) : (
+                    <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                      {displayProject.content}
+                    </ReactMarkdown>
+                  )}
                 </div>
               )}
 
@@ -753,10 +765,7 @@ export default function ProjectPage({ params }: ProjectPageProps) {
                   <Trash2 className="h-4 w-4 mr-2" />
                   {deleteProject.isPending ? "Удаление..." : "Удалить"}
                 </Button>
-                <div className="ml-auto flex items-center gap-2 text-sm text-muted-foreground">
-                  <Calendar className="h-4 w-4" />
-                  <span>{displayProject.projectYear ? String(displayProject.projectYear) : "Год не указан"}</span>
-                </div>
+                <div className="ml-auto" />
               </div>
             )}
           </CardContent>

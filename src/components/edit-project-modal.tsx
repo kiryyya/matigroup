@@ -7,7 +7,7 @@ import { Label } from "~/components/ui/label";
 import { Textarea } from "~/components/ui/textarea";
 import { useForm } from "react-hook-form";
 import React, { useEffect, useMemo, useState } from "react";
-import { X, Upload, FileText, File, Image as ImageIcon, FileVideo, FileAudio, Archive, ArrowUp, ArrowDown } from "lucide-react";
+import { X, Upload, FileText, File, Image as ImageIcon, FileVideo, FileAudio, Archive, ArrowUp, ArrowDown, Link as LinkIcon } from "lucide-react";
 import { Dialog, DialogDescription, DialogHeader, DialogTitle, DialogPortal, DialogOverlay } from "~/components/ui/dialog";
 import Loader from "~/components/ui/loader";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
@@ -87,6 +87,7 @@ export default function EditProjectModal({ isOpen, onClose, project }: EditProje
   });
 
   const [images, setImages] = useState<StoredImage[]>([]);
+  const [links, setLinks] = useState<string[]>([]);
   const [attachments, setAttachments] = useState<StoredAttachment[]>([]);
   const [isSaving, setIsSaving] = useState(false);
   const [saveStatus, setSaveStatus] = useState("");
@@ -130,6 +131,7 @@ export default function EditProjectModal({ isOpen, onClose, project }: EditProje
         categoryId: project.categoryId,
       });
       setImages(project.images ?? []);
+      setLinks([]);
       setAttachments(project.attachments ?? []);
       setProjectFilterValues(project.filterValues ?? {});
     }
@@ -325,6 +327,17 @@ export default function EditProjectModal({ isOpen, onClose, project }: EditProje
 
   const removeAttachment = (index: number) => {
     setAttachments(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const addLink = () => {
+    const url = prompt("Введите ссылку:");
+    if (url) {
+      setLinks((prev) => [...prev, url]);
+    }
+  };
+
+  const removeLink = (index: number) => {
+    setLinks((prev) => prev.filter((_, i) => i !== index));
   };
 
   const addAttachments = () => {
@@ -585,6 +598,25 @@ export default function EditProjectModal({ isOpen, onClose, project }: EditProje
                 ))}
                 <Button type="button" variant="outline" onClick={addAttachments} className="w-full">
                   <Upload className="h-4 w-4 mr-2" />Добавить файлы
+                </Button>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Ссылки</Label>
+              <div className="space-y-2">
+                {links.map((link, index) => (
+                  <div key={index} className="flex items-center gap-2">
+                    <LinkIcon className="h-4 w-4" />
+                    <span className="flex-1 text-sm truncate">{link}</span>
+                    <Button type="button" variant="outline" size="sm" onClick={() => removeLink(index)}>
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </div>
+                ))}
+                <Button type="button" variant="outline" onClick={addLink} className="w-full">
+                  <LinkIcon className="h-4 w-4 mr-2" />
+                  Добавить ссылку
                 </Button>
               </div>
             </div>
