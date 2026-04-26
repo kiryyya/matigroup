@@ -170,12 +170,14 @@ export default function FavoritesPage() {
                       {project.category?.icon} {project.category?.name}
                     </Badge>
                     
-                    <div className="flex items-center gap-4 text-sm text-gray-600">
-                      <span className="flex items-center gap-1">
-                        <Calendar className="h-4 w-4" />
-                        {project.projectYear ? String(project.projectYear) : "Год не указан"}
-                      </span>
-                    </div>
+                    {project.projectYear ? (
+                      <div className="flex items-center gap-4 text-sm text-gray-600">
+                        <span className="flex items-center gap-1">
+                          <Calendar className="h-4 w-4" />
+                          {String(project.projectYear)}
+                        </span>
+                      </div>
+                    ) : null}
                   </div>
                   
                   {/* Remove from favorites button */}

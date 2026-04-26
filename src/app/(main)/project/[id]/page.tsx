@@ -590,10 +590,12 @@ export default function ProjectPage({ params }: ProjectPageProps) {
           <div className="w-full space-y-3">
             <div className="w-full">
               <h1 className="text-2xl font-bold">{displayProject.title}</h1>
-              <div className="mt-1 flex items-center gap-2 text-sm text-muted-foreground">
-                <Calendar className="h-4 w-4" />
-                <span>{displayProject.projectYear ? String(displayProject.projectYear) : "Год не указан"}</span>
-              </div>
+              {displayProject.projectYear ? (
+                <div className="mt-1 flex items-center gap-2 text-sm text-muted-foreground">
+                  <Calendar className="h-4 w-4" />
+                  <span>{String(displayProject.projectYear)}</span>
+                </div>
+              ) : null}
               {displayProject.featured && (
                 <div className="mt-1">
                   <Badge variant="default">⭐ Рекомендуемый</Badge>
