@@ -38,39 +38,13 @@ if [ ! -f .env.prod ]; then
   exit 1
 fi
 
-if ! command -v psql >/dev/null 2>&1; then
-  echo "psql is not installed on server. Install postgresql-client and retry deploy."
-  exit 1
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [ ! -x "$SCRIPT_DIR/ensure-schema.sh" ]; then
+  chmod +x "$SCRIPT_DIR/ensure-schema.sh" || true
 fi
-
-db_url="$(grep '^DATABASE_URL=' .env.prod | tail -n1 | cut -d'=' -f2- || true)"
-if [ -z "$db_url" ]; then
-  echo "DATABASE_URL is missing in .env.prod"
-  exit 1
-fi
-
-db_url="${db_url%\"}"
-db_url="${db_url#\"}"
 
 echo "Running database schema safety patch..."
-psql "$db_url" -v ON_ERROR_STOP=1 <<'SQL'
-ALTER TABLE "categories"
-ADD COLUMN IF NOT EXISTS "filters" json DEFAULT '[]'::json;
-
-ALTER TABLE "projects"
-ADD COLUMN IF NOT EXISTS "filter_values" json DEFAULT '{}'::json;
-
-ALTER TABLE "projects"
-ADD COLUMN IF NOT EXISTS "project_year" integer;
-
-UPDATE "categories"
-SET "filters" = '[]'::json
-WHERE "filters" IS NULL;
-
-UPDATE "projects"
-SET "filter_values" = '{}'::json
-WHERE "filter_values" IS NULL;
-SQL
+"$SCRIPT_DIR/ensure-schema.sh" "$DEPLOY_DIR" .env.prod
 
 current_version="$(grep '^APP_VERSION=' "$ENV_DEPLOY_FILE" | cut -d'=' -f2- || true)"
 current_image="$(grep '^APP_IMAGE=' "$ENV_DEPLOY_FILE" | cut -d'=' -f2- || true)"

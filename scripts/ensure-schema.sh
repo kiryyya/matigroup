@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# Idempotent schema safety patch for production.
+# Single source of truth for deploy-time DB patches (instead of ad-hoc SQL in CI/deploy).
 set -euo pipefail
 
 DEPLOY_DIR="${1:-$(pwd)}"
@@ -26,21 +28,62 @@ fi
 db_url="${db_url%\"}"
 db_url="${db_url#\"}"
 
-echo "Ensuring required columns exist..."
+echo "Ensuring required tables/columns exist..."
 psql "$db_url" -v ON_ERROR_STOP=1 <<'SQL'
+-- users
+ALTER TABLE "user"
+ADD COLUMN IF NOT EXISTS "favorites" json DEFAULT '[]'::json;
+
+UPDATE "user"
+SET "favorites" = '[]'::json
+WHERE "favorites" IS NULL;
+
+-- categories
 ALTER TABLE "categories"
 ADD COLUMN IF NOT EXISTS "filters" json DEFAULT '[]'::json;
 
-ALTER TABLE "projects"
-ADD COLUMN IF NOT EXISTS "filter_values" json DEFAULT '{}'::json;
+ALTER TABLE "categories"
+ADD COLUMN IF NOT EXISTS "background_image" varchar(500);
 
 UPDATE "categories"
 SET "filters" = '[]'::json
 WHERE "filters" IS NULL;
 
+-- projects
+ALTER TABLE "projects"
+ADD COLUMN IF NOT EXISTS "attachments" json DEFAULT '[]'::json;
+
+ALTER TABLE "projects"
+ADD COLUMN IF NOT EXISTS "filter_values" json DEFAULT '{}'::json;
+
+ALTER TABLE "projects"
+ADD COLUMN IF NOT EXISTS "project_year" integer;
+
+UPDATE "projects"
+SET "attachments" = '[]'::json
+WHERE "attachments" IS NULL;
+
 UPDATE "projects"
 SET "filter_values" = '{}'::json
 WHERE "filter_values" IS NULL;
+
+-- settings (watermark etc.)
+CREATE TABLE IF NOT EXISTS "settings" (
+  "id" serial PRIMARY KEY NOT NULL,
+  "key" varchar(255) NOT NULL,
+  "value" json NOT NULL,
+  "updated_at" timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
+  "updated_by" varchar(255)
+);
+
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint WHERE conname = 'settings_key_unique'
+  ) THEN
+    ALTER TABLE "settings" ADD CONSTRAINT "settings_key_unique" UNIQUE ("key");
+  END IF;
+END $$;
 SQL
 
 echo "Schema check/migration patch completed successfully."
