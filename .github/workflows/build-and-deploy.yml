@@ -78,8 +78,8 @@ jobs:
             docker container prune -f || true
             docker image prune -af || true
             docker builder prune -af || true
-            docker volume prune -f || true
-            docker system prune -af --volumes || true
+            # Never prune volumes: Postgres/MinIO data lives there.
+            docker system prune -af || true
             df -h || true
             docker system df || true
 

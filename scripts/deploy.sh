@@ -82,13 +82,13 @@ cleanup_light() {
 }
 
 cleanup_aggressive() {
-  echo "Running aggressive Docker cleanup..."
+  echo "Running aggressive Docker cleanup (images/containers only, never volumes)..."
   docker compose --env-file "$ENV_DEPLOY_FILE" rm -sf app || true
   docker container prune -f || true
   docker image prune -af || true
   docker builder prune -af || true
-  docker volume prune -f || true
-  docker system prune -af --volumes || true
+  # Do NOT prune volumes: Postgres/MinIO data lives there.
+  docker system prune -af || true
 }
 
 retry_with_cleanup() {
