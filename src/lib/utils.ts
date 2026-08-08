@@ -32,8 +32,11 @@ export const blurImage = (src: string, width: number, height: number) =>
 export const formatPrice = (price: number) => price.toLocaleString("en-US");
 
 export function getBaseUrl() {
-  if (process.env.TUNNEL) return `https://${process.env.TUNNEL}`;
+  // In the browser always use the current origin (Mini App / tunnel URL).
+  // Preferring TUNNEL here breaks local Telegram testing when the page and
+  // env tunnel diverge, and can send API calls to a dead host.
   if (typeof window !== "undefined") return window.location.origin;
+  if (process.env.TUNNEL) return `https://${process.env.TUNNEL}`;
   if (process.env.VERCEL_URL) return `https://${process.env.VERCEL_URL}`;
   return `http://localhost:${process.env.PORT ?? 3000}`;
 }

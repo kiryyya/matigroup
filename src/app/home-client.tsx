@@ -14,10 +14,20 @@ export default function HomeClient() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const [isChecking, setIsChecking] = useState(true);
-  const { data: categories, isLoading: isLoadingCategories } = api.categories.getAll.useQuery();
-  const { data: user, isLoading: isLoadingUser, error: userError } = api.tg.getUser.useQuery();
-  
+  const { data: categories, isLoading: isLoadingCategories, isError: isCategoriesError, error: categoriesError } =
+    api.categories.getAll.useQuery(undefined, {
+      // Never hang forever in Mini App / tunnel flows.
+      retry: 2,
+      refetchOnMount: true,
+    });
+  const { data: user, isLoading: isLoadingUser, error: userError } = api.tg.getUser.useQuery(undefined, {
+    retry: 1,
+    refetchOnMount: true,
+  });
+
   useLayoutEffect(() => {
+    // Failsafe: never keep the splash loader forever.
+    const failsafe = setTimeout(() => setIsChecking(false), 2500);
     // Проверяем, был ли уже обработан deep link в этой сессии
     const processedKey = 'deep_link_processed';
     const processedParam = sessionStorage.getItem(processedKey);
@@ -138,11 +148,15 @@ export default function HomeClient() {
       checkParams();
     }, 0);
     
-    return () => clearTimeout(timer);
+    return () => {
+      clearTimeout(timer);
+      clearTimeout(failsafe);
+    };
   }, [searchParams, router, pathname]);
 
   // Пока проверяем параметры, показываем лоадер вместо контента
-  if (isChecking || isLoadingCategories) {
+  // Stop waiting if categories already failed — show empty/error UI instead of infinite spinner.
+  if (isChecking || (isLoadingCategories && !isCategoriesError)) {
     return <DefaultLoader />;
   }
 
@@ -150,7 +164,14 @@ export default function HomeClient() {
     <div className="min-h-screen flex flex-col">
       <div className="flex-1 overflow-y-auto pb-52">
         <div className="mx-auto w-full max-w-5xl px-4 py-6">
-          {categories && categories.length > 0 ? (
+          {isCategoriesError ? (
+            <div className="text-center text-muted-foreground py-10 space-y-2">
+              <div>Не удалось загрузить категории</div>
+              <div className="text-xs opacity-70">
+                {categoriesError?.message ?? "Unknown error"}
+              </div>
+            </div>
+          ) : categories && categories.length > 0 ? (
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               {categories.map((category) => (
                 <Link key={category.id} href={`/category/${category.slug}`}>

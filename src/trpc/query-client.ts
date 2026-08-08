@@ -8,18 +8,19 @@ export const createQueryClient = () =>
   new QueryClient({
     defaultOptions: {
       queries: {
-        // Увеличиваем время кэширования для лучшей производительности
-        staleTime: 5 * 60 * 1000, // 5 минут
-        gcTime: 10 * 60 * 1000, // 10 минут (заменяет cacheTime)
+        // Keep data fresh enough, but always refetch on mount in local/tunnel flows.
+        // refetchOnMount:false + dehydrated "pending" queries caused infinite loaders
+        // with zero /api/trpc hits in Telegram WebView.
+        staleTime: 30 * 1000,
+        gcTime: 10 * 60 * 1000,
         refetchOnWindowFocus: false,
-        refetchOnMount: false,
+        refetchOnMount: true,
         retry: 1,
       },
       dehydrate: {
         serializeData: SuperJSON.serialize,
-        shouldDehydrateQuery: (query) =>
-          defaultShouldDehydrateQuery(query) ||
-          query.state.status === "pending",
+        // Do NOT dehydrate pending queries — client would wait forever with no network.
+        shouldDehydrateQuery: (query) => defaultShouldDehydrateQuery(query),
       },
       hydrate: {
         deserializeData: SuperJSON.deserialize,

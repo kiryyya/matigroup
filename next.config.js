@@ -14,22 +14,43 @@ if (process.env.SKIP_ENV_VALIDATION !== "true") {
 }
 
 /** @type {import("next").NextConfig} */
+const isDev = process.env.NODE_ENV !== "production";
+
+// Next.js dev/HMR needs 'unsafe-eval'. Without it Telegram WebView loads HTML/JS
+// files but React never hydrates → no /api/trpc calls (exactly what we saw in DevTools).
+const scriptSrc = [
+  "'self'",
+  "'unsafe-inline'",
+  ...(isDev ? ["'unsafe-eval'"] : []),
+  "https://telegram.org",
+  "https://*.telegram.org",
+].join(" ");
+
 const cspHeader = [
   "default-src 'self'",
-  "script-src 'self' 'unsafe-inline' https://telegram.org https://*.telegram.org",
+  `script-src ${scriptSrc}`,
   "style-src 'self' 'unsafe-inline'",
   "img-src 'self' data: blob: https:",
   "font-src 'self' data:",
-  "connect-src 'self' https: wss:",
+  "connect-src 'self' https: wss: ws:",
   "media-src 'self' blob: https:",
   "object-src 'none'",
   "base-uri 'self'",
   "form-action 'self'",
   "frame-ancestors 'self' https://web.telegram.org https://webk.telegram.org https://webz.telegram.org https://*.telegram.org",
-  "upgrade-insecure-requests",
+  ...(isDev ? [] : ["upgrade-insecure-requests"]),
 ].join("; ");
 
 const config = {
+  // Allow Mini App traffic via local tunnels in `next dev`.
+  // Without this, Next can serve HTML but block/break client API calls from tunnel origins.
+  allowedDevOrigins: [
+    "*.trycloudflare.com",
+    "*.loca.lt",
+    "*.ngrok-free.app",
+    "*.ngrok-free.dev",
+    "*.ngrok.io",
+  ],
   eslint: {
     ignoreDuringBuilds: true,
   },

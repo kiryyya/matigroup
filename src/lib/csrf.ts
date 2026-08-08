@@ -9,11 +9,34 @@ const ALLOWED_ORIGINS = [
   "https://web.telegram.org",
   "https://webk.telegram.org",
   "https://webz.telegram.org",
+  "http://localhost:3000",
+  "http://127.0.0.1:3000",
   process.env.NEXT_PUBLIC_APP_URL,
 ].filter(Boolean) as string[];
 
+const DEV_TUNNEL_HOST_SUFFIXES = [
+  ".trycloudflare.com",
+  ".loca.lt",
+  ".ngrok-free.app",
+  ".ngrok-free.dev",
+  ".ngrok.io",
+];
+
 function isSafeMethod(method: string): boolean {
   return method === "GET" || method === "HEAD" || method === "OPTIONS";
+}
+
+function isDevTunnelOrigin(origin: string): boolean {
+  if (process.env.NODE_ENV === "production") {
+    return false;
+  }
+
+  try {
+    const host = new URL(origin).hostname;
+    return DEV_TUNNEL_HOST_SUFFIXES.some((suffix) => host.endsWith(suffix));
+  } catch {
+    return false;
+  }
 }
 
 function isOriginAllowed(value: string | null): boolean {
@@ -23,6 +46,9 @@ function isOriginAllowed(value: string | null): boolean {
 
   try {
     const valueUrl = new URL(value);
+    if (isDevTunnelOrigin(valueUrl.origin)) {
+      return true;
+    }
     return ALLOWED_ORIGINS.some((allowed) => {
       try {
         const allowedUrl = new URL(allowed);
@@ -81,10 +107,18 @@ export function validateCSRF(request: NextRequest): boolean {
 /**
  * Проверяет CSRF для tRPC запросов
  * @param headers - Headers объект
+ * @param httpMethod - реальный HTTP method запроса (GET/POST/...)
  * @throws TRPCError если запрос небезопасен
  */
-export function validateCSRFForTRPC(headers: Headers): void {
-  const method = headers.get("x-http-method-override") ?? "POST";
+export function validateCSRFForTRPC(
+  headers: Headers,
+  httpMethod?: string,
+): void {
+  // IMPORTANT: do not default to POST — same-origin GETs often have no
+  // x-http-method-override and no Origin header; defaulting to POST falsely
+  // treats them as mutating and blocks Telegram Mini App / tunnel traffic.
+  const method =
+    headers.get("x-http-method-override") ?? httpMethod ?? "POST";
 
   if (isSafeMethod(method)) {
     return;

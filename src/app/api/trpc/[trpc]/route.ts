@@ -44,7 +44,7 @@ const handler = (req: NextRequest) => {
   
   // CSRF защита для tRPC запросов
   try {
-    validateCSRFForTRPC(req.headers);
+    validateCSRFForTRPC(req.headers, req.method);
   } catch (error) {
     console.error(`[tRPC] CSRF validation failed:`, error);
     // Если CSRF проверка не прошла, возвращаем ошибку
@@ -62,6 +62,8 @@ const handler = (req: NextRequest) => {
     req,
     router: appRouter,
     createContext: () => createContext(req),
+    // Allow POST for queries (httpBatchLink may POST when batching / overrides).
+    allowMethodOverride: true,
     onError: ({ path, error }) => {
       console.error(
         `❌ tRPC failed on ${path ?? "<no-path>"}: ${error.message}`,
