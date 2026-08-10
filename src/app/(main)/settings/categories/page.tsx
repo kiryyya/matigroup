@@ -412,6 +412,7 @@ export default function CategoriesSettingsPage() {
               />
             </div>
 
+            {/* Slug скрыт: генерируется автоматически из названия
             <div>
               <Label htmlFor="slug">Slug (опционально)</Label>
               <Input
@@ -424,6 +425,7 @@ export default function CategoriesSettingsPage() {
                 Если оставить пустым, slug сгенерируется автоматически из названия (транслитерация)
               </p>
             </div>
+            */}
 
             <div>
               <Label htmlFor="description">Описание</Label>

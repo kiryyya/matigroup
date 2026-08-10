@@ -16,7 +16,13 @@ import { toast } from "sonner";
 import { useModal } from "~/contexts/modal-context";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import remarkBreaks from "remark-breaks";
 import type { StoredAttachment, StoredImage } from "~/types/files";
+
+/** Markdown по умолчанию схлопывает одиночные \n и табы — готовим текст к отображению */
+function prepareMarkdownText(text: string) {
+  return text.replace(/\t/g, "    ");
+}
 
 interface ProjectPageProps {
   params: {
@@ -643,6 +649,7 @@ export default function ProjectPage({ params }: ProjectPageProps) {
                 onClick={() => {
                   try {
                     const link = `https://t.me/matibott_bot?startapp=project_${displayProject.id}`;
+                    // const link = `https://t.me/mati_test_bot?startapp=project_${displayProject.id}`;
                     void navigator.clipboard.writeText(link);
                     toast.success("Ссылка для Mini App скопирована");
                   } catch (e) {
@@ -664,20 +671,23 @@ export default function ProjectPage({ params }: ProjectPageProps) {
             </CardHeader>
             <CardContent className="space-y-4 flex-1">
               {displayProject.description && (
-                <div className="prose prose-sm max-w-none text-muted-foreground dark:prose-invert">
-                  <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                    {displayProject.description}
+                <div className="prose prose-sm max-w-none whitespace-pre-wrap text-muted-foreground dark:prose-invert">
+                  <ReactMarkdown remarkPlugins={[remarkGfm, remarkBreaks]}>
+                    {prepareMarkdownText(displayProject.description)}
                   </ReactMarkdown>
                 </div>
               )}
               
               {displayProject.content && (
-                <div className="prose prose-sm max-w-none text-muted-foreground dark:prose-invert">
+                <div className="prose prose-sm max-w-none whitespace-pre-wrap text-muted-foreground dark:prose-invert">
                   {looksLikeHtml(displayProject.content) ? (
-                    <div dangerouslySetInnerHTML={{ __html: displayProject.content }} />
+                    <div
+                      className="whitespace-pre-wrap"
+                      dangerouslySetInnerHTML={{ __html: displayProject.content }}
+                    />
                   ) : (
-                    <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                      {displayProject.content}
+                    <ReactMarkdown remarkPlugins={[remarkGfm, remarkBreaks]}>
+                      {prepareMarkdownText(displayProject.content)}
                     </ReactMarkdown>
                   )}
                 </div>

@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 import React, { useEffect, useState, type PropsWithChildren } from "react";
 import useTelegramInitData from "~/hooks/use-telegram-init-data";
 import useTelegramBackButton from "~/hooks/use-telegram-back-button";
-import { Heart, Home, MessageCircle, Settings } from "lucide-react";
+import { Heart, HelpCircle, Home, Settings } from "lucide-react";
 import { api } from "~/trpc/react";
 import { cn } from "~/lib/utils";
 import { useModal } from "~/contexts/modal-context";
@@ -80,7 +80,7 @@ const GeneralLayout = ({ children }: PropsWithChildren) => {
                   : "text-muted-foreground hover:text-foreground"
               )}
             >
-              <MessageCircle className="h-5 w-5" />
+              <HelpCircle className="h-5 w-5" />
             </Link>
             {user?.role === "admin" && (
               <Link 

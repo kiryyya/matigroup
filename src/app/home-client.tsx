@@ -7,6 +7,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { Card, CardDescription, CardHeader, CardTitle } from "~/components/ui/card";
 import DefaultLoader from "~/components/layouts/default-loader";
+import { ignoreNextBackDepthChange } from "~/hooks/use-telegram-back-button";
 import { api } from "~/trpc/react";
 
 export default function HomeClient() {
@@ -89,6 +90,7 @@ export default function HomeClient() {
         }
         // Сохраняем, что этот параметр уже обработан
         sessionStorage.setItem(processedKey, startParam);
+        ignoreNextBackDepthChange();
         router.replace(`/project/${id}`);
         return;
       }
@@ -101,6 +103,7 @@ export default function HomeClient() {
         }
         // Сохраняем, что этот параметр уже обработан
         sessionStorage.setItem(processedKey, startParam);
+        ignoreNextBackDepthChange();
         router.replace(`/category/${id}`);
         return;
       }
@@ -113,6 +116,7 @@ export default function HomeClient() {
         }
         // Сохраняем, что этот параметр уже обработан
         sessionStorage.setItem(processedKey, startParam);
+        ignoreNextBackDepthChange();
         router.replace('/settings');
         return;
       }
@@ -125,6 +129,7 @@ export default function HomeClient() {
         }
         // Сохраняем, что этот параметр уже обработан
         sessionStorage.setItem(processedKey, startParam);
+        ignoreNextBackDepthChange();
         router.replace('/');
         return;
       }

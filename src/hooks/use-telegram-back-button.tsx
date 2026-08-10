@@ -5,9 +5,27 @@ import { usePathname, useRouter } from "next/navigation";
 import { useModal } from "~/contexts/modal-context";
 
 /**
+ * Счётчик клиентских переходов внутри Mini App.
+ * history.length / referrer / history.state.idx в Telegram WebView ненадёжны.
+ * - cold open / deep link → depth = 0 → «Назад» ведёт на главную
+ * - после in-app push → depth > 0 → обычный router.back()
+ *
+ * Deep link ходит через router.replace с главной — это НЕ должно увеличивать depth,
+ * иначе Back вызовет router.back() по пустой истории и «залипнет».
+ */
+let inAppHistoryDepth = 0;
+let skipNextDepthUpdate = false;
+let ignoreNextPathChange = false;
+
+/** Вызывать перед router.replace deep link'а, чтобы не считать его за in-app историю */
+export function ignoreNextBackDepthChange() {
+  ignoreNextPathChange = true;
+}
+
+/**
  * Хук для управления системной кнопкой "Назад" в Telegram Web App
  * Использует useLayoutEffect для синхронного обновления без задержек
- * 
+ *
  * Логика:
  * - На главной странице (pathname === "/"): BackButton скрыта → показывается кнопка "Закрыть" (крестик)
  * - На других страницах: BackButton показана → кнопка "Закрыть" автоматически скрывается Telegram
@@ -16,12 +34,32 @@ export default function useTelegramBackButton() {
   const pathname = usePathname();
   const router = useRouter();
   const { isModalOpen, isFileModalOpen, setIsFileModalOpen } = useModal();
-  
+
   // Используем ref для хранения обработчика, чтобы не пересоздавать его
   const handlerRef = useRef<(() => void) | null>(null);
   // Используем ref для отслеживания предыдущего состояния, чтобы избежать лишних вызовов
   const prevShouldShowRef = useRef<boolean | null>(null);
-  
+  const prevPathnameRef = useRef(pathname);
+
+  // Трекаем in-app навигацию сами — только так надёжно отличить deep link от истории
+  useLayoutEffect(() => {
+    if (prevPathnameRef.current === pathname) {
+      return;
+    }
+
+    if (ignoreNextPathChange) {
+      ignoreNextPathChange = false;
+      // replace deep link / принудительный уход на главную — depth не трогаем
+    } else if (skipNextDepthUpdate) {
+      skipNextDepthUpdate = false;
+      inAppHistoryDepth = Math.max(0, inAppHistoryDepth - 1);
+    } else {
+      inAppHistoryDepth += 1;
+    }
+
+    prevPathnameRef.current = pathname;
+  }, [pathname]);
+
   // Мемоизируем функцию обновления BackButton
   const updateBackButton = useCallback(
     (force = false) => {
@@ -45,7 +83,7 @@ export default function useTelegramBackButton() {
       // Используем синхронную проверку через window.location для более раннего определения
       // Это гарантирует, что мы получаем актуальный путь до того, как React обновит pathname
       const currentPath = typeof window !== "undefined" ? window.location.pathname : pathname;
-      
+
       // Удаляем предыдущий обработчик, если он был
       if (handlerRef.current) {
         BackButton.offClick(handlerRef.current);
@@ -56,7 +94,7 @@ export default function useTelegramBackButton() {
       if (isFileModalOpen) {
         // Показываем BackButton для закрытия модального окна
         BackButton.show();
-        
+
         const handleBack = () => {
           console.log("BackButton clicked: closing file modal");
           setIsFileModalOpen(false);
@@ -87,7 +125,15 @@ export default function useTelegramBackButton() {
 
         // Создаем новый обработчик нажатия
         const handleBack = () => {
-          router.back();
+          if (inAppHistoryDepth > 0) {
+            skipNextDepthUpdate = true;
+            router.back();
+            return;
+          }
+
+          // Deep-link / cold open: истории внутри приложения нет → на главную
+          ignoreNextPathChange = true;
+          router.replace("/");
         };
 
         handlerRef.current = handleBack;

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
+import { ignoreNextBackDepthChange } from "~/hooks/use-telegram-back-button";
 
 export default function useTelegramStartParam() {
   const router = useRouter();
@@ -120,6 +121,7 @@ export default function useTelegramStartParam() {
         case 'project':
           if (id) {
             console.log('Переход к проекту:', id);
+            ignoreNextBackDepthChange();
             router.replace(`/project/${id}`);
           }
           break;
@@ -127,6 +129,7 @@ export default function useTelegramStartParam() {
         case 'category':
           if (id) {
             console.log('Переход к категории:', id);
+            ignoreNextBackDepthChange();
             router.replace(`/category/${id}`);
           }
           break;
@@ -134,12 +137,14 @@ export default function useTelegramStartParam() {
         case 'profile':
         case 'settings':
           console.log('Переход к настройкам');
+          ignoreNextBackDepthChange();
           router.replace('/settings');
           break;
 
         case 'home':
         case 'main':
           console.log('Переход на главную');
+          ignoreNextBackDepthChange();
           router.replace('/');
           break;
 

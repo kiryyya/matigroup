@@ -14,9 +14,21 @@ if (process.env.SKIP_ENV_VALIDATION !== "true") {
 }
 
 /** @type {import("next").NextConfig} */
+const isDev = process.env.NODE_ENV !== "production";
+
+// Next.js dev needs 'unsafe-eval' for hydration/HMR. Without it Telegram WebView
+// loads scripts but React never runs, so /api/trpc never fires locally.
+const scriptSrc = [
+  "'self'",
+  "'unsafe-inline'",
+  ...(isDev ? ["'unsafe-eval'"] : []),
+  "https://telegram.org",
+  "https://*.telegram.org",
+].join(" ");
+
 const cspHeader = [
   "default-src 'self'",
-  "script-src 'self' 'unsafe-inline' https://telegram.org https://*.telegram.org",
+  `script-src ${scriptSrc}`,
   "style-src 'self' 'unsafe-inline'",
   "img-src 'self' data: blob: https:",
   "font-src 'self' data:",
