@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+  workflow_dispatch:
 
 jobs:
   build-and-push:
@@ -45,12 +46,31 @@ jobs:
     runs-on: ubuntu-latest
     needs: build-and-push
     steps:
+      - name: Check required secrets
+        run: |
+          missing=0
+          for name in SSH_HOST SSH_USER SSH_KEY; do
+            # values are masked; emptiness check via github context is enough for presence
+            echo "Checking $name..."
+          done
+          if [ -z "${{ secrets.SSH_HOST }}" ] || [ -z "${{ secrets.SSH_USER }}" ] || [ -z "${{ secrets.SSH_KEY }}" ]; then
+            echo "::error::Missing SSH_HOST / SSH_USER / SSH_KEY. Update GitHub Actions secrets to the current server."
+            exit 1
+          fi
+          echo "SSH_HOST is set (length ${#SSH_HOST_VALUE})"
+        env:
+          SSH_HOST_VALUE: ${{ secrets.SSH_HOST }}
+
       - name: Deploy via SSH
         uses: appleboy/ssh-action@v1.2.0
         with:
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_KEY }}
+          port: 22
+          timeout: 60s
+          command_timeout: 30m
+          script_stop: true
           script: |
             set -euo pipefail
             DEPLOY_PATH="${{ secrets.DEPLOY_PATH }}"
@@ -58,8 +78,9 @@ jobs:
               DEPLOY_PATH="/opt/matigroup"
             fi
 
+            echo "Deploy host=$(hostname) path=$DEPLOY_PATH version=${{ needs.build-and-push.outputs.image_version }}"
+
             # Try to authenticate to GHCR if token is provided
-            # For public packages, this might not be needed, but it doesn't hurt
             if [ -n "${{ secrets.GHCR_TOKEN }}" ]; then
               echo "Authenticating to GHCR with token..."
               echo "${{ secrets.GHCR_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
@@ -71,6 +92,12 @@ jobs:
             fi
 
             cd "$DEPLOY_PATH"
+            if [ ! -f scripts/deploy.sh ]; then
+              echo "scripts/deploy.sh missing in $DEPLOY_PATH"
+              ls -la
+              exit 1
+            fi
+
             echo "Pre-deploy cleanup to avoid 'no space left on device'..."
             df -h || true
             docker system df || true
@@ -84,7 +111,13 @@ jobs:
             docker system df || true
 
             if ! command -v psql >/dev/null 2>&1; then
-              apt-get update && apt-get install -y postgresql-client
+              if command -v apt-get >/dev/null 2>&1; then
+                if [ "$(id -u)" -eq 0 ]; then
+                  apt-get update && apt-get install -y postgresql-client
+                else
+                  sudo apt-get update && sudo apt-get install -y postgresql-client
+                fi
+              fi
             fi
 
             chmod +x scripts/deploy.sh scripts/rollback.sh scripts/ensure-schema.sh

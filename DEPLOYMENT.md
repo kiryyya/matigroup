@@ -115,9 +115,18 @@ What it does:
 
 ### Required GitHub secrets
 
-- `SSH_HOST` - server host
-- `SSH_USER` - SSH user
-- `SSH_KEY` - private key
+- `SSH_HOST` - server host (current: `77.241.20.130`)
+- `SSH_USER` - SSH user with docker access (example: `kirill1q` or `root`)
+- `SSH_KEY` - private deploy key (full PEM / OpenSSH private key)
 - `DEPLOY_PATH` - path to deployment directory (example: `/opt/matigroup`)
+- `GHCR_TOKEN` - optional PAT with `read:packages` if GHCR package is private
+- `SSH_FINGERPRINT` - optional host key fingerprint for `appleboy/ssh-action`
 
 If `DEPLOY_PATH` is empty, workflow uses `/opt/matigroup`.
+
+Helper scripts:
+
+- `scripts/setup-github-deploy-secrets.sh` — writes secrets via `gh`
+- `scripts/prepare-server.sh` — copies compose/deploy scripts to the server
+
+Important: old host `155.212.159.251` is dead/unreachable; Actions will `i/o timeout` if `SSH_HOST` still points there.
