@@ -80,7 +80,7 @@ const GeneralLayout = ({ children }: PropsWithChildren) => {
                   : "text-muted-foreground hover:text-foreground"
               )}
             >
-              <HelpCircle className="h-5 w-5" />
+              <HelpCircle className="h-[22px] w-[22px]" />
             </Link>
             {user?.role === "admin" && (
               <Link 

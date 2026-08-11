@@ -656,10 +656,10 @@ export default function ProjectPage({ params }: ProjectPageProps) {
                     toast.error("Не удалось скопировать ссылку");
                   }
                 }}
-                title="Скопировать ссылку"
+                title="Скопировать ссылку на проект"
               >
                 <Copy className="h-4 w-4 mr-2" />
-                Скопировать
+                Скопировать ссылку на проект
               </Button>
             </div>
           </div>
@@ -758,10 +758,11 @@ export default function ProjectPage({ params }: ProjectPageProps) {
 
             {/* Кнопки управления (внизу под описанием) */}
             {user?.role === "admin" && (
-              <div className="flex flex-wrap gap-2 pt-4 border-t">
+              <div className="flex flex-col gap-2 pt-4 border-t">
                 <Button
                   variant="outline"
                   size="sm"
+                  className="w-full"
                   onClick={() => setIsEditOpen(true)}
                   title="Редактировать проект"
                 >
@@ -771,13 +772,13 @@ export default function ProjectPage({ params }: ProjectPageProps) {
                 <Button
                   variant="destructive"
                   size="sm"
+                  className="w-full"
                   onClick={handleDeleteProject}
                   disabled={deleteProject.isPending}
                 >
                   <Trash2 className="h-4 w-4 mr-2" />
                   {deleteProject.isPending ? "Удаление..." : "Удалить"}
                 </Button>
-                <div className="ml-auto" />
               </div>
             )}
           </CardContent>
